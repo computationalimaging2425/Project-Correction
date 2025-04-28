@@ -37,6 +37,7 @@ def downsample_images(input_dir, output_dir, target_size=(128, 128)):
 
 # Cell 3: Example Usage
 # Replace the following paths with your own directories, then uncomment to run:
-input_dir = "train"
+input_dir = "test"
 output_dir = "128x128_images"
+output_dir = os.path.join(output_dir, input_dir)
 downsample_images(input_dir, output_dir)
