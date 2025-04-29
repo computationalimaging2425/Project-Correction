@@ -6,3 +6,6 @@
 
 # Model
 checkpoints/
+
+# Python
+__pycache__/
