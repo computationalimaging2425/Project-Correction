@@ -19,7 +19,3 @@ def sample_images(output_path="result/ddim_sample.png", num_steps=NUM_TRAIN_TIME
         final = (sample.clamp(-1, 1) + 1) / 2
         transforms.ToPILImage()(final.squeeze(0).squeeze(0).cpu()).save(output_path)
         print(f"Sample saved to {output_path}")
-        # print original image
-        original_image = transforms.ToPILImage()(sample.squeeze(0).squeeze(0).cpu())
-        # save original image
-        original_image.save(output_path.replace(".png", "_original.png"))
