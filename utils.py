@@ -137,6 +137,7 @@ def sample_images(
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     model.eval()
     with torch.no_grad():
+        # Sample random noise
         sample = torch.randn((1, 1, IMAGE_SIZE, IMAGE_SIZE), device=DEVICE)
 
         for t in tqdm(
