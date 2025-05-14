@@ -1,6 +1,16 @@
 from diffusers import UNet2DModel
 
-def get_unet_model(sample_size=128, in_channels=1, out_channels=1, layers_per_block=2, block_out_channels=(64, 128, 256, 512), down_block_types=("DownBlock2D", "DownBlock2D", "DownBlock2D", "AttnDownBlock2D"), up_block_types=("AttnUpBlock2D", "UpBlock2D", "UpBlock2D", "UpBlock2D")):
+
+def get_unet_model(
+    sample_size=128,
+    in_channels=1,
+    out_channels=1,
+    layers_per_block=2,
+    block_out_channels=(64, 128, 256, 512),
+    down_block_types=("DownBlock2D", "DownBlock2D", "DownBlock2D", "AttnDownBlock2D"),
+    up_block_types=("AttnUpBlock2D", "UpBlock2D", "UpBlock2D", "UpBlock2D"),
+    dropout=0.1,
+):
     """
     Function to create a UNet model for image generation.
 
@@ -21,6 +31,7 @@ def get_unet_model(sample_size=128, in_channels=1, out_channels=1, layers_per_bl
         block_out_channels=block_out_channels,
         down_block_types=down_block_types,
         up_block_types=up_block_types,
+        dropout=dropout,
     )
 
     return model
