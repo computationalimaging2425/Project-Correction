@@ -13,11 +13,7 @@ def get_unet_model(
 ):
     """
     Function to create a UNet model for image generation.
-
-    Parameters:
-    IMAGE_SIZE (int): The size of the images to be generated.
-    LEARNING_RATE (float): The learning rate for the optimizer.
-
+    
     Returns:
     UNet2DModel: A UNet model configured for image generation.
     """
