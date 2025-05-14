@@ -56,10 +56,27 @@ def change_brightness(img: Image.Image, factor=1.2):
 def change_contrast(img: Image.Image, factor=1.3):
     return ImageEnhance.Contrast(img).enhance(factor)
 
+AUGMENTATION_FUNCTIONS = {
+    "rot": lambda img, param, size: rotate_fixed(img, param, size),
+    "flip": lambda img, param, size: horizontal_flip(img),
+    "noise_gaussian": lambda img, param, size: add_gaussian_noise(
+        img, **param
+    ).resize((size, size), Image.BICUBIC),
+    "noise_salt_pepper": lambda img, param, size: add_salt_pepper(
+        img, **param
+    ).resize((size, size), Image.BICUBIC),
+    "bright": lambda img, param, size: change_brightness(img, **param).resize(
+        (size, size), Image.BICUBIC
+    ),
+    "contrast": lambda img, param, size: change_contrast(img, **param).resize(
+        (size, size), Image.BICUBIC
+    ),
+}
+
 
 class AugmentedDataset(Dataset):
-    def __init__(self, root_dir, image_size=128):
-        # dataset base che carica le immagini in grayscale e le ridimensiona
+
+    def __init__(self, root_dir, image_size=128, augmentations=None):
         self.base_ds = datasets.ImageFolder(
             root=root_dir,
             transform=transforms.Compose(
@@ -69,55 +86,42 @@ class AugmentedDataset(Dataset):
                 ]
             ),
         )
-        self.angles = [-5, -3, 3, 5]
-        self.noise_types = ["gaussian", "salt_pepper"]
-        # lista di tutte le possibili trasformazioni (None = immagine originale)
-        self.augs = (
-            [None]
-            + [("rot", a) for a in self.angles]
-            + [("flip", None)]
-            + [("noise", "gaussian"), ("noise", "salt_pepper")]
-            + [("bright", None), ("contrast", None)]
-        )
-        self.image_size = image_size
 
-        # fine pipeline per convertire PIL→Tensor normalizzato [-1,1]
+        self.image_size = image_size
         self.to_tensor = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize([0.5], [0.5])]
         )
 
+        # Default augmentation set
+        if augmentations is None:
+            self.augmentations = [
+                {"type": None}, # no augmentation
+                {"type": "rot", "param": -5}, 
+                {"type": "rot", "param": 5},
+                {"type": "flip"},
+                # {"type": "noise_gaussian", "param": {"mean": 0.0, "std": 10.0}},
+                # {"type": "noise_salt_pepper", "param": {"prob": 0.02}},
+                # {"type": "bright", "param": {"factor": 1.2}},
+                # {"type": "contrast", "param": {"factor": 1.3}},
+            ]
+        else:
+            self.augmentations = augmentations
+
     def __len__(self):
-        return len(self.base_ds) * len(self.augs)
+        return len(self.base_ds) * len(self.augmentations)
 
     def __getitem__(self, idx):
-        # individuo immagine base + tipo di augment
-        img_idx = idx // len(self.augs)
-        aug_idx = idx % len(self.augs)
+        img_idx = idx // len(self.augmentations)
+        aug_idx = idx % len(self.augmentations)
 
-        img, label = self.base_ds[img_idx]  # PIL in grayscale 128×128
-        aug = self.augs[aug_idx]
+        img, label = self.base_ds[img_idx]
+        aug = self.augmentations[aug_idx]
 
-        # applica la augmentazione scelta
-        if aug is not None:
-            mode, param = aug
-            if mode == "rot":
-                img = rotate_fixed(img, param, self.image_size)
-            elif mode == "flip":
-                img = horizontal_flip(img)
-            elif mode == "noise":
-                if param == "gaussian":
-                    img = add_gaussian_noise(img, mean=0.0, std=10.0)
-                else:
-                    img = add_salt_pepper(img, prob=0.02)
-                img = img.resize((self.image_size, self.image_size), Image.BICUBIC)
-            elif mode == "bright":
-                img = change_brightness(img, factor=1.2)
-                img = img.resize((self.image_size, self.image_size), Image.BICUBIC)
-            elif mode == "contrast":
-                img = change_contrast(img, factor=1.3)
-                img = img.resize((self.image_size, self.image_size), Image.BICUBIC)
+        if aug["type"] is not None:
+            func = AUGMENTATION_FUNCTIONS[aug["type"]]
+            param = aug.get("param", {})
+            img = func(img, param, self.image_size)
 
-        # infine trasformo in tensor e normalizzo
         img_t = self.to_tensor(img)
         return img_t, label
 
@@ -145,3 +149,21 @@ def sample_images(
         final = (sample.clamp(-1, 1) + 1) / 2
         transforms.ToPILImage()(final.squeeze(0).squeeze(0).cpu()).save(output_path)
         print(f"Sample saved to {output_path}")
+
+def save_checkpoint(model, optimizer, epoch, path):
+    """
+    Salva il checkpoint del modello e dell'ottimizzatore.
+
+    Args:
+        model (torch.nn.Module): Il modello da salvare.
+        optimizer (torch.optim.Optimizer): L'ottimizzatore da salvare.
+        epoch (int): Epoca corrente.
+        path (str): Percorso completo per il file `.pth`.
+    """
+    checkpoint = {
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+        "epoch": epoch,
+    }
+    torch.save(checkpoint, path)
+    print(f"Checkpoint salvato in: {path}")
