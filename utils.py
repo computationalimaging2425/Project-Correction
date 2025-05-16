@@ -99,10 +99,10 @@ class AugmentedDataset(Dataset):
                 {"type": "rot", "param": -5}, 
                 {"type": "rot", "param": 5},
                 {"type": "flip"},
-                # {"type": "noise_gaussian", "param": {"mean": 0.0, "std": 10.0}},
-                # {"type": "noise_salt_pepper", "param": {"prob": 0.02}},
-                # {"type": "bright", "param": {"factor": 1.2}},
-                # {"type": "contrast", "param": {"factor": 1.3}},
+                {"type": "noise_gaussian", "param": {"mean": 0.0, "std": 10.0}},
+                {"type": "noise_salt_pepper", "param": {"prob": 0.02}},
+                {"type": "bright", "param": {"factor": 1.2}},
+                {"type": "contrast", "param": {"factor": 1.3}},
             ]
         else:
             self.augmentations = augmentations
