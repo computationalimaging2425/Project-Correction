@@ -10,6 +10,7 @@ import numpy as np
 
 NUM_TRAIN_TIMESTEPS = 1000
 IMAGE_SIZE = 128
+BATCH_SIZE = 16
 
 
 # DATA AUGMENTATION
@@ -278,10 +279,12 @@ def load_checkpoint(
     model.eval()
 
     if loaded:
-        print(f"Model {model_to_load_name} loaded successfully to {device}, starting from epoch {start_epoch}.")
+        print(
+            f"Model {model_to_load_name} loaded successfully to {device}, starting from epoch {start_epoch}."
+        )
     else:
         print(f"Model {model_to_load_name} not found, starting fresh on {device}.")
-    
+
     return loaded, model, optimizer, start_epoch
 
 
@@ -331,6 +334,13 @@ def get_unet_model(
 
 
 def setup_environment(on_colab=False):
+    """
+    returns:
+        - data_root: path to the raw data directory
+        - model_save_dir: path to the model save directory
+        - train_dir: path to the training data directory
+        - test_dir: path to the testing data directory
+    """
     if on_colab:
         from google.colab import drive
 
@@ -362,3 +372,37 @@ def print_model_summary(model):
     print(f"Model Type: {type(model).__name__}")
     print(f"Number of Parameters: {sum(p.numel() for p in model.parameters())}")
     print(f"Device: {next(model.parameters()).device}")
+
+
+def get_dataloader(
+    root_dir,
+    batch_size=BATCH_SIZE,
+    image_size=IMAGE_SIZE,
+    shuffle=True,
+    num_workers=4,
+    pin_memory=True,
+):
+    dataset = AugmentedDataset(root_dir, image_size=image_size)
+    dataloader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+    )
+    return dataloader
+
+
+def get_schedulers():
+    from diffusers import DDPMScheduler, DDIMScheduler
+
+    noise_scheduler = DDPMScheduler(num_train_timesteps=NUM_TRAIN_TIMESTEPS)
+    ddim_scheduler = DDIMScheduler(
+        beta_start=noise_scheduler.config.beta_start,
+        beta_end=noise_scheduler.config.beta_end,
+        beta_schedule=noise_scheduler.config.beta_schedule,
+        clip_sample=True,
+    )
+    ddim_scheduler.set_timesteps(NUM_TRAIN_TIMESTEPS)
+
+    return noise_scheduler, ddim_scheduler
