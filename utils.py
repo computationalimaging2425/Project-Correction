@@ -443,7 +443,7 @@ def dps_deblur(
     """
     import torch
     import torch.nn.functional as F
-    from tqdm import tqdm
+    from tqdm.auto import tqdm
 
     # Inizializza x_T con rumore gaussiano
     batch_size = y.shape[0]
@@ -454,12 +454,17 @@ def dps_deblur(
     # Se non è implementato, bisogna implementare la convoluzione trasposta
     K_adjoint = K.T(y)  # esempio di come potrebbe essere fatto
 
-    for t in tqdm(ddim_scheduler.timesteps, desc="DPS sampling"):
+    for t in tqdm(
+        ddim_scheduler.timesteps,
+        desc="DPS sampling",
+        unit="step",
+        leave=False
+    ):
         t_batch = torch.full((batch_size,), t, dtype=torch.long, device=device)
 
         # Predizione del rumore epsilon con il modello UNet
         out = model(x_t, t_batch)
-        eps_theta = out.sample       # <— questo è un Tensor di shape (B, C, H, W)
+        eps_theta = out.sample  # <— questo è un Tensor di shape (B, C, H, W)
 
         # Calcolo x_0 predetto dal modello: x0_pred = (x_t - sqrt(1-alpha_t) * eps_theta) / sqrt(alpha_t)
         alpha_prod_t = noise_scheduler.alphas_cumprod[t].to(device)
@@ -516,3 +521,96 @@ def dps_deblur(
         )
 
     return x_t
+
+
+def dps_deblur_and_plot(
+    num_images=5,
+    test_loader=None,
+    K=None,
+    model=None,
+    device="cpu",
+    ddim_scheduler=None,
+    noise_scheduler=None,
+):
+    """
+    Picks `num_images` random images from the test set,
+    applies motion blur, reconstructs via DPS, and plots results.
+    """
+    import random
+    import matplotlib.pyplot as plt
+    from IPPy import metrics
+    from tqdm.auto import tqdm
+
+    # Random selection of indices
+    indices = random.sample(range(len(test_loader.dataset)), k=num_images)
+
+    # Prepare figure with num_images rows and 3 columns
+    fig, axes = plt.subplots(num_images, 3, figsize=(12, 4 * num_images))
+
+    for row, idx in enumerate(
+        tqdm(indices, desc="Processing images", unit="image")
+    ):
+        # Load, blur, reconstruct
+        x_true = test_loader.dataset[idx][0].unsqueeze(0).to(device)
+        x_blurred = K(x_true)
+        x_recon = dps_deblur(
+            model=model,
+            ddim_scheduler=ddim_scheduler,
+            y=x_blurred,
+            K=K,
+            noise_scheduler=noise_scheduler,
+            num_timesteps=NUM_TRAIN_TIMESTEPS,
+            eta=0.0,
+            device=device,
+        )
+
+        # Compute metrics
+        psnr_blur = metrics.PSNR(x_true.cpu(), x_blurred.cpu())
+        ssim_blur = metrics.SSIM(x_true.cpu(), x_blurred.cpu())
+        psnr_recon = metrics.PSNR(x_true.cpu(), x_recon.cpu())
+        ssim_recon = metrics.SSIM(x_true.cpu(), x_recon.cpu())
+
+        # Titles with bold for higher
+        psnr_blur_str = f"PSNR: {psnr_blur:.4f} dB"
+        psnr_recon_str = f"PSNR: {psnr_recon:.4f} dB"
+        ssim_blur_str = f"SSIM: {ssim_blur:.4f}"
+        ssim_recon_str = f"SSIM: {ssim_recon:.4f}"
+
+        if psnr_blur > psnr_recon:
+            psnr_blur_str = f"$\\bf{{{psnr_blur_str}}}$"
+        else:
+            psnr_recon_str = f"$\\bf{{{psnr_recon_str}}}$"
+        if ssim_blur > ssim_recon:
+            ssim_blur_str = f"$\\bf{{{ssim_blur_str}}}$"
+        else:
+            ssim_recon_str = f"$\\bf{{{ssim_recon_str}}}$"
+
+        # Plot original
+        ax_orig = axes[row, 0] if num_images > 1 else axes[0]
+        ax_orig.imshow(x_true.cpu().numpy()[0, 0], cmap="gray")
+        ax_orig.axis("off")
+        if row == 0:
+            ax_orig.set_title("Original")
+
+        # Plot blurred
+        ax_blur = axes[row, 1] if num_images > 1 else axes[1]
+        ax_blur.imshow(x_blurred.cpu().numpy()[0, 0], cmap="gray")
+        ax_blur.axis("off")
+        if row == 0:
+            ax_blur.set_title(f"Blurred\n{psnr_blur_str}\n{ssim_blur_str}")
+        else:
+            # Only metrics in subsequent rows
+            ax_blur.set_title(f"{psnr_blur_str}\n{ssim_blur_str}")
+
+        # Plot reconstructed
+        ax_recon = axes[row, 2] if num_images > 1 else axes[2]
+        ax_recon.imshow(x_recon.cpu().numpy()[0, 0], cmap="gray")
+        ax_recon.axis("off")
+        if row == 0:
+            ax_recon.set_title(f"Reconstructed\n{psnr_recon_str}\n{ssim_recon_str}")
+        else:
+            ax_recon.set_title(f"{psnr_recon_str}\n{ssim_recon_str}")
+
+    fig.suptitle("Deblurring con DPS - Batch Visualization", fontsize=16)
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.show()
