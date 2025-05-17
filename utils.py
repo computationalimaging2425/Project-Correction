@@ -209,7 +209,7 @@ def sample_images_from_validation(
                 img_rec = rec_np[i, 0]
                 concat = Image.fromarray(np.concatenate([img_clean, img_rec], axis=1))
 
-                path = os.path.join(output_dir, f"recon_{epoch}_{saved}.png")
+                path = os.path.join(output_dir, f"reconstructed_epoch_{epoch}_{saved}.png")
                 concat.save(path)
                 saved += 1
 
