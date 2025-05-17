@@ -159,6 +159,7 @@ def sample_images_from_validation(
     num_timesteps=NUM_TRAIN_TIMESTEPS,
     device="cpu",
     max_examples=5,
+    epoch=0,
 ):
     """
     Per ogni batch in test_loader:
@@ -194,8 +195,8 @@ def sample_images_from_validation(
             x0_hat = x0_hat.clamp(-1,1)
 
             # denormalizza e salva
-            clean_np = ((clean_imgs.cpu().numpy() + 1) * 127.5).astype("uint8")
-            rec_np   = ((x0_hat.cpu().numpy()   + 1) * 127.5).astype("uint8")
+            clean_np = ((clean_imgs.cpu().numpy() + 1) * 127.5).astype(np.uint8)
+            rec_np   = ((x0_hat.cpu().numpy()   + 1) * 127.5).astype(np.uint8)
 
             for i in range(batch_size):
                 if saved >= max_examples:
@@ -205,7 +206,8 @@ def sample_images_from_validation(
                 concat = Image.fromarray(
                     np.concatenate([img_clean, img_rec], axis=1)
                 )
-                path = os.path.join(output_dir, f"recon_{saved}.png")
+                
+                path = os.path.join(output_dir, f"recon_{epoch}_{saved}.png")
                 concat.save(path)
                 saved += 1
 
