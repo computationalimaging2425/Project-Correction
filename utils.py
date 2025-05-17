@@ -209,7 +209,9 @@ def sample_images_from_validation(
                 img_rec = rec_np[i, 0]
                 concat = Image.fromarray(np.concatenate([img_clean, img_rec], axis=1))
 
-                path = os.path.join(output_dir, f"reconstructed_epoch_{epoch}_{saved}.png")
+                path = os.path.join(
+                    output_dir, f"reconstructed_epoch_{epoch}_{saved}.png"
+                )
                 concat.save(path)
                 saved += 1
 
@@ -410,3 +412,107 @@ def get_schedulers():
     ddim_scheduler.set_timesteps(NUM_TRAIN_TIMESTEPS)
 
     return noise_scheduler, ddim_scheduler
+
+
+@torch.no_grad()
+def dps_deblur(
+    model,
+    ddim_scheduler,
+    y,  # immagine sfocata, tensor (B, C, H, W)
+    K,  # operatore di blur
+    noise_scheduler,
+    num_timesteps=1000,
+    eta=0.0,  # controlla la stochasticità (0=deterministico)
+    device="cpu",
+):
+    """
+    Applica DPS per il deblurring usando il modello di diffusione UNet.
+
+    Args:
+        model: modello UNet pre-addestrato
+        scheduler: DDIM scheduler per diffusione inversa
+        y: immagine sfocata (batch_size, channels, H, W)
+        K: operatore blur (funzione che applica blur e il suo adjoint)
+        noise_scheduler: scheduler del rumore (usato per ottenere sigma_t)
+        num_inference_steps: numero di passi di campionamento
+        eta: param. per la diffusione DDIM
+        device: device CUDA o CPU
+
+    Returns:
+        x_recon: immagine ricostruita (B, C, H, W)
+    """
+    import torch
+    import torch.nn.functional as F
+    from tqdm import tqdm
+
+    # Inizializza x_T con rumore gaussiano
+    batch_size = y.shape[0]
+    x_t = torch.randn_like(y).to(device)
+
+    # Pre-calcola l'operatore adjoint K^T
+    # assumiamo che K abbia un metodo K.adjoint()
+    # Se non è implementato, bisogna implementare la convoluzione trasposta
+    K_adjoint = K.T(y)  # esempio di come potrebbe essere fatto
+
+    for t in tqdm(ddim_scheduler.timesteps, desc="DPS sampling"):
+        t_batch = torch.full((batch_size,), t, dtype=torch.long, device=device)
+
+        # Predizione del rumore epsilon con il modello UNet
+        out = model(x_t, t_batch)
+        eps_theta = out.sample       # <— questo è un Tensor di shape (B, C, H, W)
+
+        # Calcolo x_0 predetto dal modello: x0_pred = (x_t - sqrt(1-alpha_t) * eps_theta) / sqrt(alpha_t)
+        alpha_prod_t = noise_scheduler.alphas_cumprod[t].to(device)
+        sqrt_alpha_prod_t = torch.sqrt(alpha_prod_t)
+        sqrt_one_minus_alpha_prod_t = torch.sqrt(1 - alpha_prod_t)
+        x0_pred = (x_t - sqrt_one_minus_alpha_prod_t * eps_theta) / sqrt_alpha_prod_t
+
+        # --- Posterior update DPS ---
+        # Calcolo la likelihood based update usando la degradazione y = K x + noise
+        # Per DPS si aggiorna x0_pred con:
+        # x0_post = argmin_x || y - K x ||^2 / sigma_y^2 + || x - x0_pred ||^2 / sigma_prior^2
+        # formula chiusa: (K^T K / sigma_y^2 + I / sigma_prior^2)^-1 (K^T y / sigma_y^2 + x0_pred / sigma_prior^2)
+
+        # Per semplicità ipotizziamo sigma_y e sigma_prior (varianze)
+        sigma_y = 0.01
+        sigma_prior = torch.sqrt(
+            1 - alpha_prod_t
+        ).item()  # varianza rumore diffusione a t
+
+        # Calcolo termini
+        # x0_pred e y sono tensori (B, C, H, W)
+        K_x0 = K(x0_pred)  # Blur dell'immagine stimata
+
+        # Calcolo il numeratore del posterior update
+        numerator = (K.T(y) / (sigma_y**2)) + (x0_pred / (sigma_prior**2))
+        # Calcolo il denominatore (operatore): (K^T K / sigma_y^2 + I / sigma_prior^2)
+        # Poiché il calcolo esplicito dell'inverso è costoso, approssimiamo con un passo di gradiente o iterazione
+        # Per semplicità facciamo una singola iterazione di gradiente esplicita:
+        # x_new = numerator / denom approx
+        # Nota: un'alternativa più precisa richiede la risoluzione di un sistema lineare (es. CG)
+
+        # Qui approssimiamo denom come (1 / sigma_prior^2 + 1 / sigma_y^2), assumendo K^T K ~ I (approssimazione)
+        denom = (1 / (sigma_prior**2)) + (1 / (sigma_y**2))
+        x0_post = numerator / denom
+
+        # Correggi x_t per il passo successivo usando x0_post (DDIM update formula)
+        # Qui usiamo il metodo DDIM per tornare da x0_post a x_{t-1}
+        # x_t_minus_1 = DDIM update step
+        alpha_prod_t_prev = noise_scheduler.alphas_cumprod[max(t - 1, 0)].to(device)
+        sqrt_alpha_prod_t_prev = torch.sqrt(alpha_prod_t_prev)
+        sigma_t = (
+            eta
+            * torch.sqrt((1 - alpha_prod_t_prev) / (1 - alpha_prod_t))
+            * torch.sqrt(1 - alpha_prod_t / alpha_prod_t_prev)
+        )
+
+        pred_noise = (x_t - sqrt_alpha_prod_t * x0_post) / sqrt_one_minus_alpha_prod_t
+
+        # DDIM step formula
+        x_t = (
+            sqrt_alpha_prod_t_prev * x0_post
+            + torch.sqrt(1 - alpha_prod_t_prev - sigma_t**2) * pred_noise
+            + sigma_t * torch.randn_like(x_t)
+        )
+
+    return x_t
