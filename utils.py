@@ -126,7 +126,7 @@ class AugmentedDataset(Dataset):
         return img_t, label
 
 
-def sample_images(
+def sample_images_from_pure_noise(
     output_path="result/ddim_sample.png",
     num_steps=NUM_TRAIN_TIMESTEPS,
     DEVICE="cpu",
@@ -150,6 +150,66 @@ def sample_images(
         final = (sample.clamp(-1, 1) + 1) / 2
         transforms.ToPILImage()(final.squeeze(0).squeeze(0).cpu()).save(output_path)
         print(f"Sample saved to {output_path}")
+
+def sample_images_from_validation(
+    model,
+    noise_scheduler,
+    test_loader,
+    output_dir="result/val_reconstructions",
+    num_timesteps=NUM_TRAIN_TIMESTEPS,
+    device="cpu",
+    max_examples=5,
+):
+    """
+    Per ogni batch in test_loader:
+      • prende un'immagine pulita x0
+      • aggiunge rumore x_t = q(x_t|x0) con t casuale
+      • predice l'epsilon con la U-Net
+      • ricostruisce x0_hat da x_t e epsilon_pred
+      • salva side-by-side (clean | recon) per i primi max_examples
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    model.eval()
+    to_pil = transforms.ToPILImage()
+
+    saved = 0
+    with torch.no_grad():
+        for clean_imgs, _ in tqdm(test_loader, desc="Reconstructions"):
+            clean_imgs = clean_imgs.to(device)
+            batch_size = clean_imgs.size(0)
+
+            # rumore e timestep casuali
+            noise = torch.randn_like(clean_imgs)
+            timesteps = torch.randint(0, num_timesteps, (batch_size,), device=device)
+
+            # noising
+            x_t = noise_scheduler.add_noise(clean_imgs, noise, timesteps)
+
+            # predizione e ricostruzione one-step
+            out = model(x_t, timesteps).sample
+            alpha_t = noise_scheduler.alphas_cumprod[timesteps].view(-1,1,1,1)
+            sqrt_alpha = torch.sqrt(alpha_t)
+            sqrt_1m_alpha = torch.sqrt(1 - alpha_t)
+            x0_hat = (x_t - sqrt_1m_alpha * out) / sqrt_alpha
+            x0_hat = x0_hat.clamp(-1,1)
+
+            # denormalizza e salva
+            clean_np = ((clean_imgs.cpu().numpy() + 1) * 127.5).astype("uint8")
+            rec_np   = ((x0_hat.cpu().numpy()   + 1) * 127.5).astype("uint8")
+
+            for i in range(batch_size):
+                if saved >= max_examples:
+                    return
+                img_clean = clean_np[i, 0]
+                img_rec   = rec_np[i, 0]
+                concat = Image.fromarray(
+                    np.concatenate([img_clean, img_rec], axis=1)
+                )
+                path = os.path.join(output_dir, f"recon_{saved}.png")
+                concat.save(path)
+                saved += 1
+
+    print(f"Saved {saved} validation reconstructions to {output_dir}")
 
 def save_checkpoint(model, optimizer, epoch, path):
     """
