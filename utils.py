@@ -9,6 +9,7 @@ from PIL import Image, ImageEnhance
 import numpy as np
 
 NUM_TRAIN_TIMESTEPS = 1000
+IMAGE_SIZE = 128
 
 
 # DATA AUGMENTATION
@@ -56,15 +57,16 @@ def change_brightness(img: Image.Image, factor=1.2):
 def change_contrast(img: Image.Image, factor=1.3):
     return ImageEnhance.Contrast(img).enhance(factor)
 
+
 AUGMENTATION_FUNCTIONS = {
     "rot": lambda img, param, size: rotate_fixed(img, param, size),
     "flip": lambda img, param, size: horizontal_flip(img),
-    "noise_gaussian": lambda img, param, size: add_gaussian_noise(
-        img, **param
-    ).resize((size, size), Image.BICUBIC),
-    "noise_salt_pepper": lambda img, param, size: add_salt_pepper(
-        img, **param
-    ).resize((size, size), Image.BICUBIC),
+    "noise_gaussian": lambda img, param, size: add_gaussian_noise(img, **param).resize(
+        (size, size), Image.BICUBIC
+    ),
+    "noise_salt_pepper": lambda img, param, size: add_salt_pepper(img, **param).resize(
+        (size, size), Image.BICUBIC
+    ),
     "bright": lambda img, param, size: change_brightness(img, **param).resize(
         (size, size), Image.BICUBIC
     ),
@@ -95,8 +97,8 @@ class AugmentedDataset(Dataset):
         # Default augmentation set
         if augmentations is None:
             self.augmentations = [
-                {"type": None}, # no augmentation
-                {"type": "rot", "param": -5}, 
+                {"type": None},  # no augmentation
+                {"type": "rot", "param": -5},
                 {"type": "rot", "param": 5},
                 {"type": "flip"},
                 {"type": "noise_gaussian", "param": {"mean": 0.0, "std": 10.0}},
@@ -151,6 +153,7 @@ def sample_images_from_pure_noise(
         transforms.ToPILImage()(final.squeeze(0).squeeze(0).cpu()).save(output_path)
         print(f"Sample saved to {output_path}")
 
+
 def sample_images_from_validation(
     model,
     noise_scheduler,
@@ -188,30 +191,29 @@ def sample_images_from_validation(
 
             # predizione e ricostruzione one-step
             out = model(x_t, timesteps).sample
-            alpha_t = noise_scheduler.alphas_cumprod[timesteps].view(-1,1,1,1)
+            alpha_t = noise_scheduler.alphas_cumprod[timesteps].view(-1, 1, 1, 1)
             sqrt_alpha = torch.sqrt(alpha_t)
             sqrt_1m_alpha = torch.sqrt(1 - alpha_t)
             x0_hat = (x_t - sqrt_1m_alpha * out) / sqrt_alpha
-            x0_hat = x0_hat.clamp(-1,1)
+            x0_hat = x0_hat.clamp(-1, 1)
 
             # denormalizza e salva
             clean_np = ((clean_imgs.cpu().numpy() + 1) * 127.5).astype(np.uint8)
-            rec_np   = ((x0_hat.cpu().numpy()   + 1) * 127.5).astype(np.uint8)
+            rec_np = ((x0_hat.cpu().numpy() + 1) * 127.5).astype(np.uint8)
 
             for i in range(batch_size):
                 if saved >= max_examples:
                     return
                 img_clean = clean_np[i, 0]
-                img_rec   = rec_np[i, 0]
-                concat = Image.fromarray(
-                    np.concatenate([img_clean, img_rec], axis=1)
-                )
-                
+                img_rec = rec_np[i, 0]
+                concat = Image.fromarray(np.concatenate([img_clean, img_rec], axis=1))
+
                 path = os.path.join(output_dir, f"recon_{epoch}_{saved}.png")
                 concat.save(path)
                 saved += 1
 
     print(f"Saved {saved} validation reconstructions to {output_dir}")
+
 
 def save_checkpoint(model, optimizer, epoch, path):
     """
@@ -230,3 +232,133 @@ def save_checkpoint(model, optimizer, epoch, path):
     }
     torch.save(checkpoint, path)
     print(f"Checkpoint salvato in: {path}")
+
+
+def load_checkpoint(
+    model_save_dir,
+    model_to_load_name,
+    model,
+    optimizer=None,
+    device=torch.device("cpu"),
+):
+    import os
+    import torch
+
+    loaded = False
+    ckpt_path = os.path.join(model_save_dir, model_to_load_name)
+
+    if not os.path.exists(ckpt_path):
+        print(f"No checkpoint found at {ckpt_path}, starting fresh on {device}.")
+        return loaded, model, optimizer, 0
+
+    checkpoint = torch.load(ckpt_path, map_location=device)
+
+    # Rimuovi il prefisso "_orig_mod." dalle chiavi se presente
+    new_state_dict = {}
+    for k, v in checkpoint["model"].items():
+        if k.startswith("_orig_mod."):
+            new_k = k.replace("_orig_mod.", "")
+            new_state_dict[new_k] = v
+        else:
+            new_state_dict[k] = v
+
+    model.load_state_dict(new_state_dict)
+    model.to(device)
+    loaded = True
+    start_epoch = checkpoint.get("epoch", 0)
+
+    if optimizer is not None and "optimizer" in checkpoint:
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        print(f"Loaded optimizer state from checkpoint '{ckpt_path}'")
+    else:
+        print("Optimizer state not found in checkpoint, starting with a new optimizer.")
+
+    print(f"Loaded checkpoint '{ckpt_path}' (epoch {start_epoch})")
+
+    model.eval()
+
+    if loaded:
+        print(f"Model {model_to_load_name} loaded successfully to {device}, starting from epoch {start_epoch}.")
+    else:
+        print(f"Model {model_to_load_name} not found, starting fresh on {device}.")
+    
+    return loaded, model, optimizer, start_epoch
+
+
+LEARNING_RATE = 1e-4
+WEIGHT_DECAY = 1e-5
+
+
+def get_unet_model(
+    sample_size=128,
+    in_channels=1,
+    out_channels=1,
+    layers_per_block=2,
+    block_out_channels=(64, 128, 256),
+    down_block_types=("DownBlock2D", "DownBlock2D", "AttnDownBlock2D"),
+    up_block_types=("AttnUpBlock2D", "UpBlock2D", "UpBlock2D"),
+    dropout=0.1,
+    learning_rate=LEARNING_RATE,
+    weight_decay=WEIGHT_DECAY,
+    device="cpu",
+):
+    """
+    Function to create a UNet model for image generation.
+
+    Returns:
+    UNet2DModel: A UNet model configured for image generation.
+    """
+
+    from diffusers import UNet2DModel
+
+    # Create the UNet model with the specified parameters
+    model = UNet2DModel(
+        sample_size=sample_size,
+        in_channels=in_channels,
+        out_channels=out_channels,
+        layers_per_block=layers_per_block,
+        block_out_channels=block_out_channels,
+        down_block_types=down_block_types,
+        up_block_types=up_block_types,
+        dropout=dropout,
+    )
+
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=learning_rate, weight_decay=weight_decay
+    )
+
+    return model.to(device), optimizer
+
+
+def setup_environment(on_colab=False):
+    if on_colab:
+        from google.colab import drive
+
+        drive.mount(os.getenv("GOOGLE_DRIVE_CONTENT_PATH", "/content/drive"))
+        data_root = os.getenv(
+            "GOOGLE_DRIVE_RAW_DATA_DIR",
+            "/content/drive/MyDrive/ComputationalImaging/raw_data",
+        )
+        model_save_dir = os.getenv(
+            "GOOGLE_DRIVE_MODEL_SAVE_DIR",
+            "/content/drive/MyDrive/ComputationalImaging/checkpoints",
+        )
+    else:
+        data_root = os.getenv("RAW_DATA_DIR", "raw_data")
+        model_save_dir = os.getenv("MODEL_SAVE_DIR", "checkpoints")
+
+    os.makedirs(model_save_dir, exist_ok=True)
+    print(f"Data root: {data_root}")
+    print(f"Model save directory: {model_save_dir}")
+
+    train_dir = os.path.join(data_root, "train")
+    test_dir = os.path.join(data_root, "test")
+
+    return data_root, model_save_dir, train_dir, test_dir
+
+
+def print_model_summary(model):
+    print("Model Summary:")
+    print(f"Model Type: {type(model).__name__}")
+    print(f"Number of Parameters: {sum(p.numel() for p in model.parameters())}")
+    print(f"Device: {next(model.parameters()).device}")
