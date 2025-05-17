@@ -330,7 +330,11 @@ def get_unet_model(
         model.parameters(), lr=learning_rate, weight_decay=weight_decay
     )
 
-    return model.to(device), optimizer
+    # Move the model to the specified device
+    model.to(device)
+    print(f"Model moved to {device}")
+
+    return model, optimizer
 
 
 def setup_environment(on_colab=False):
