@@ -715,6 +715,7 @@ def red_diff_and_plot(
     """
     import matplotlib.pyplot as plt
     from IPPy import metrics
+    import random
 
     # Select random indices
     indices = random.sample(range(len(test_loader.dataset)), num_images)
@@ -728,6 +729,7 @@ def red_diff_and_plot(
             noise_scheduler=noise_scheduler,
             y=y,
             K=K,
+            num_steps=NUM_TRAIN_TIMESTEPS,
             device=device,
         )
 
