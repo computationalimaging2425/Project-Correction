@@ -7,22 +7,23 @@
   \usecolortheme[named=Periwinkle]{structure}
   \useoutertheme{shadow}
   \setbeamertemplate{navigation symbols}{}
+  \setbeamertemplate{headline}{}
 }
 \usepackage[italian]{babel}
-\usepackage[latin1]{inputenc}
+\usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{graphicx}
 \hypersetup{
-  pdftitle={Titolo della Presentazione},
-  pdfauthor={Autore}
+  pdftitle={Performance Analysis for Projection-Correction Methods in Motion Deblurring Problems},
+  pdfauthor={Sara Casadio, Enrico Ferraiolo, Giovanni Savoca}
 }
 
 % Title and Author
-\title[Short Title]{Titolo della Presentazione}
-\author[Autore]{Nome Cognome}
-\institute[Affiliazione]{%
-  Istituzione \\
-  Corso di Laurea
+\title[Progetto]{Performance Analysis for Projection-Correction Methods in Motion Deblurring Problems}
+\author[Autore]{Sara Casadio, Enrico Ferraiolo, Giovanni Savoca}
+\institute[Istituzione]{%
+  Alma Mater Studiorum - Università di Bologna \\
+  Corso di Laurea in Informatica
 }
 \date{\today}
 
@@ -33,17 +34,9 @@
   \titlepage
 \end{frame}
 
-% Outline Frame
-\begin{frame}{Indice}
-  \tableofcontents
-\end{frame}
-
 % Section 1
-\section{Sezione 1}
-\subsection{Sottosezione 1.1}
-\begin{frame}{Sottosezione 1.1}
-  % Contenuto qui
-\end{frame}
+\section{Descrizione del problema}
+\input{capitoli/DescrizioneProblema.tex}
 
 \subsection{Sottosezione 1.2}
 \begin{frame}{Sottosezione 1.2}
@@ -51,7 +44,63 @@
 \end{frame}
 
 % Section 2
-\section{Sezione 2}
+\section{Approccio di risoluzione con dps e rediff + modello diffusivo}
+\subsection{Sottosezione 2.1}
+\begin{frame}{Sottosezione 2.1}
+  % Contenuto qui
+\end{frame}
+
+% Section 3
+\section{Dataset} %Preprocessing del dataset (128*128) + dataset aumentato 
+\subsection{Sottosezione 2.1}
+\begin{frame}{Sottosezione 2.1}
+  % Contenuto qui
+\end{frame}
+
+% Section 4
+\section{organizzazione della repository}
+\subsection{Sottosezione 2.1}
+\begin{frame}{Sottosezione 2.1}
+  % Contenuto qui
+\end{frame}
+
+% Section 5
+\section{architettura della rete diffusiva} 
+\subsection{Sottosezione 2.1}
+\begin{frame}{Sottosezione 2.1}
+  % Contenuto qui
+\end{frame}
+
+% Section 6
+\section{Training} %data augmentation + data loader + scheduler + torch.compite + grade scaler + cosineannealing + spiegaizone dello step di apprendimento della reta + per ogni epoca viene stampata una immagine per capire se la rete sta funzionando + spiegazione loss (come funziona) + salvataggio pesi + grafico loss
+\subsection{Sottosezione 2.1}
+\begin{frame}{Sottosezione 2.1}
+  % Contenuto qui
+\end{frame}
+
+% Section 7
+\section{Caricamento dei pesi (come funziona che non dobbiamo sempre allenare il modello e possiamo caricarli deìirettamente )} 
+\subsection{Sottosezione 2.1}
+\begin{frame}{Sottosezione 2.1}
+  % Contenuto qui
+\end{frame}
+
+% Section 8
+\section{codice dei due metodi} 
+\subsection{Sottosezione 2.1}
+\begin{frame}{Sottosezione 2.1}
+  % Contenuto qui
+\end{frame}
+
+% Section 9
+\section{codice immagine degradata} 
+\subsection{Sottosezione 2.1}
+\begin{frame}{Sottosezione 2.1}
+  % Contenuto qui
+\end{frame}
+
+% Section 9
+\section{risultati} 
 \subsection{Sottosezione 2.1}
 \begin{frame}{Sottosezione 2.1}
   % Contenuto qui
