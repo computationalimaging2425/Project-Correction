@@ -421,7 +421,6 @@ def dps_deblur(
     y,  # immagine sfocata, tensor (B, C, H, W)
     K,  # operatore di blur
     noise_scheduler,
-    num_timesteps=1000,
     eta=0.0,  # controlla la stochasticità (0=deterministico)
     device="cpu",
 ):
@@ -455,10 +454,7 @@ def dps_deblur(
     K_adjoint = K.T(y)  # esempio di come potrebbe essere fatto
 
     for t in tqdm(
-        ddim_scheduler.timesteps,
-        desc="DPS sampling",
-        unit="step",
-        leave=False
+        ddim_scheduler.timesteps, desc="DPS sampling", unit="step", leave=False
     ):
         t_batch = torch.full((batch_size,), t, dtype=torch.long, device=device)
 
@@ -547,16 +543,14 @@ def dps_deblur_and_plot(
     # Prepare figure with num_images rows and 3 columns
     fig, axes = plt.subplots(num_images, 3, figsize=(12, 4 * num_images))
 
-    for row, idx in enumerate(
-        tqdm(indices, desc="Processing images", unit="image")
-    ):
+    for row, idx in enumerate(tqdm(indices, desc="Processing images", unit="image")):
         # Load, blur, reconstruct
         x_true = test_loader.dataset[idx][0].unsqueeze(0).to(device)
-        x_blurred = K(x_true)
+        y = K(x_true)
         x_recon = dps_deblur(
             model=model,
             ddim_scheduler=ddim_scheduler,
-            y=x_blurred,
+            y=y,
             K=K,
             noise_scheduler=noise_scheduler,
             num_timesteps=NUM_TRAIN_TIMESTEPS,
@@ -565,22 +559,22 @@ def dps_deblur_and_plot(
         )
 
         # Compute metrics
-        psnr_blur = metrics.PSNR(x_true.cpu(), x_blurred.cpu())
-        ssim_blur = metrics.SSIM(x_true.cpu(), x_blurred.cpu())
-        psnr_recon = metrics.PSNR(x_true.cpu(), x_recon.cpu())
-        ssim_recon = metrics.SSIM(x_true.cpu(), x_recon.cpu())
+        psnr_deg = metrics.PSNR(x_true.cpu(), y.cpu())
+        ssim_deg = metrics.SSIM(x_true.cpu(), y.cpu())
+        psnr_rec = metrics.PSNR(x_true.cpu(), x_recon.cpu())
+        ssim_rec = metrics.SSIM(x_true.cpu(), x_recon.cpu())
 
         # Titles with bold for higher
-        psnr_blur_str = f"PSNR: {psnr_blur:.4f} dB"
-        psnr_recon_str = f"PSNR: {psnr_recon:.4f} dB"
-        ssim_blur_str = f"SSIM: {ssim_blur:.4f}"
-        ssim_recon_str = f"SSIM: {ssim_recon:.4f}"
+        psnr_blur_str = f"PSNR: {psnr_deg:.4f} dB"
+        psnr_recon_str = f"PSNR: {psnr_rec:.4f} dB"
+        ssim_blur_str = f"SSIM: {ssim_deg:.4f}"
+        ssim_recon_str = f"SSIM: {ssim_rec:.4f}"
 
-        if psnr_blur > psnr_recon:
+        if psnr_deg > psnr_rec:
             psnr_blur_str = f"$\\bf{{{psnr_blur_str}}}$"
         else:
             psnr_recon_str = f"$\\bf{{{psnr_recon_str}}}$"
-        if ssim_blur > ssim_recon:
+        if ssim_deg > ssim_rec:
             ssim_blur_str = f"$\\bf{{{ssim_blur_str}}}$"
         else:
             ssim_recon_str = f"$\\bf{{{ssim_recon_str}}}$"
@@ -594,7 +588,7 @@ def dps_deblur_and_plot(
 
         # Plot blurred
         ax_blur = axes[row, 1] if num_images > 1 else axes[1]
-        ax_blur.imshow(x_blurred.cpu().numpy()[0, 0], cmap="gray")
+        ax_blur.imshow(y.cpu().numpy()[0, 0], cmap="gray")
         ax_blur.axis("off")
         if row == 0:
             ax_blur.set_title(f"Blurred\n{psnr_blur_str}\n{ssim_blur_str}")
@@ -611,19 +605,19 @@ def dps_deblur_and_plot(
         else:
             ax_recon.set_title(f"{psnr_recon_str}\n{ssim_recon_str}")
 
-    fig.suptitle("Deblurring con DPS - Batch Visualization", fontsize=16)
+    fig.suptitle("Deblurring con DPS", fontsize=16)
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
 
 def red_diff(
     model,
+    ddim_scheduler,
+    y,  # degraded measurement tensor (B, C, H, W)
+    K,  # measurement operator with forward K(x) and adjoint K.T(y)
     noise_scheduler,
-    y,            # degraded measurement tensor (B, C, H, W)
-    K,            # measurement operator with forward K(x) and adjoint K.T(y)
-    sigma_y=0.01, # assumed measurement noise std
+    sigma_y=0.01,  # assumed measurement noise std
     lambda_scale=0.25,  # regularization scale
-    num_steps=1000,
     lr=0.1,
     device="cpu",
 ):
@@ -644,7 +638,7 @@ def red_diff(
     Returns:
         mu: reconstructed image tensor (B, C, H, W)
     """
-    
+
     import torch
     import torch.nn.functional as F
     from tqdm.auto import tqdm
@@ -657,7 +651,9 @@ def red_diff(
     optimizer = torch.optim.Adam([mu], lr=lr)
     T = noise_scheduler.alphas_cumprod.shape[0] - 1
 
-    for _ in tqdm(range(num_steps), desc="RED-Diff sampling", unit="step"):
+    for _ in tqdm(
+        ddim_scheduler.timesteps, desc="RED-Diff sampling", unit="step", leave=False
+    ):
         # Sample random timestep
         t = random.randint(1, T)
         t_batch = torch.full((mu.shape[0],), t, dtype=torch.long, device=device)
@@ -684,7 +680,10 @@ def red_diff(
         lambda_t = lambda_scale / snr
 
         # Regularization loss (stop gradient on eps and weight)
-        reg = (lambda_t.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) * (eps_theta - eps).pow(2)).mean()
+        reg = (
+            lambda_t.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+            * (eps_theta - eps).pow(2)
+        ).mean()
 
         loss = rec + reg
 
@@ -694,13 +693,15 @@ def red_diff(
 
     return mu.detach()
 
+
 def red_diff_and_plot(
     num_images=5,
     test_loader=None,
     K=None,
     model=None,
-    noise_scheduler=None,
     device="cpu",
+    noise_scheduler=None,
+    ddim_scheduler=None,
 ):
     """
     Applies RED-Diff to random images from test_loader, then plots original, degraded, and reconstructed.
@@ -716,12 +717,16 @@ def red_diff_and_plot(
     import matplotlib.pyplot as plt
     from IPPy import metrics
     import random
+    from tqdm.auto import tqdm
 
     # Select random indices
     indices = random.sample(range(len(test_loader.dataset)), num_images)
+
+    # Prepare figure with num_images rows and 3 columns
     fig, axes = plt.subplots(num_images, 3, figsize=(12, 4 * num_images))
 
-    for row, idx in enumerate(indices):
+    for row, idx in enumerate(tqdm(indices, desc="Processing images", unit="image")):
+        # Load, blur, reconstruct
         x_true = test_loader.dataset[idx][0].unsqueeze(0).to(device)
         y = K(x_true)
         x_recon = red_diff(
@@ -729,7 +734,7 @@ def red_diff_and_plot(
             noise_scheduler=noise_scheduler,
             y=y,
             K=K,
-            num_steps=NUM_TRAIN_TIMESTEPS,
+            ddim_scheduler=ddim_scheduler,
             device=device,
         )
 
@@ -739,19 +744,47 @@ def red_diff_and_plot(
         psnr_rec = metrics.PSNR(x_true.cpu(), x_recon.cpu())
         ssim_rec = metrics.SSIM(x_true.cpu(), x_recon.cpu())
 
-        # Plot
-        for col, (img, title) in enumerate([
-            (x_true, "Original"),
-            (y, f"Degraded\nPSNR: {psnr_deg:.2f} SSIM: {ssim_deg:.2f}"),
-            (x_recon, f"Reconstructed\nPSNR: {psnr_rec:.2f} SSIM: {ssim_rec:.2f}"),
-        ]):
-            ax = axes[row, col] if num_images > 1 else axes[col]
-            ax.imshow(img.cpu().numpy()[0].transpose(1, 2, 0))
-            ax.axis("off")
-            if row == 0:
-                ax.set_title(title)
+        # Titles with bold for higher
+        psnr_blur_str = f"PSNR: {psnr_deg:.4f} dB"
+        psnr_recon_str = f"PSNR: {psnr_rec:.4f} dB"
+        ssim_blur_str = f"SSIM: {ssim_deg:.4f}"
+        ssim_recon_str = f"SSIM: {ssim_rec:.4f}"
+
+        if psnr_deg > psnr_rec:
+            psnr_blur_str = f"$\\bf{{{psnr_blur_str}}}$"
+        else:
+            psnr_recon_str = f"$\\bf{{{psnr_recon_str}}}$"
+        if ssim_deg > ssim_rec:
+            ssim_blur_str = f"$\\bf{{{ssim_blur_str}}}$"
+        else:
+            ssim_recon_str = f"$\\bf{{{ssim_recon_str}}}$"
+
+        # Plot original
+        ax_orig = axes[row, 0] if num_images > 1 else axes[0]
+        ax_orig.imshow(x_true.cpu().numpy()[0, 0], cmap="gray")
+        ax_orig.axis("off")
+        if row == 0:
+            ax_orig.set_title("Original")
+
+        # Plot blurred
+        ax_blur = axes[row, 1] if num_images > 1 else axes[1]
+        ax_blur.imshow(y.cpu().numpy()[0, 0], cmap="gray")
+        ax_blur.axis("off")
+        if row == 0:
+            ax_blur.set_title(f"Blurred\n{psnr_blur_str}\n{ssim_blur_str}")
+        else:
+            # Only metrics in subsequent rows
+            ax_blur.set_title(f"{psnr_blur_str}\n{ssim_blur_str}")
+
+        # Plot reconstructed
+        ax_recon = axes[row, 2] if num_images > 1 else axes[2]
+        ax_recon.imshow(x_recon.cpu().numpy()[0, 0], cmap="gray")
+        ax_recon.axis("off")
+        if row == 0:
+            ax_recon.set_title(f"Reconstructed\n{psnr_recon_str}\n{ssim_recon_str}")
+        else:
+            ax_recon.set_title(f"{psnr_recon_str}\n{ssim_recon_str}")
 
     fig.suptitle("RED-Diff Reconstruction", fontsize=16)
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
-
