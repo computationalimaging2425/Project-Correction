@@ -5,7 +5,7 @@
 .vscode
 
 # Model
-#checkpoints/
+checkpoints/
 
 # Python
 __pycache__/
