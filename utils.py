@@ -614,3 +614,142 @@ def dps_deblur_and_plot(
     fig.suptitle("Deblurring con DPS - Batch Visualization", fontsize=16)
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
+
+
+def red_diff(
+    model,
+    noise_scheduler,
+    y,            # degraded measurement tensor (B, C, H, W)
+    K,            # measurement operator with forward K(x) and adjoint K.T(y)
+    sigma_y=0.01, # assumed measurement noise std
+    lambda_scale=0.25,  # regularization scale
+    num_steps=1000,
+    lr=0.1,
+    device="cpu",
+):
+    """
+    Variational sampler (RED-Diff) for inverse problems.
+
+    Args:
+        model: pretrained diffusion UNet model
+        noise_scheduler: scheduler providing alphas_cumprod
+        y: observed measurement (B, C, H, W)
+        K: degradation operator with methods K(x) and K.T(y)
+        sigma_y: measurement noise standard deviation
+        lambda_scale: hyperparameter balancing prior vs likelihood
+        num_steps: number of optimization steps
+        lr: learning rate for Adam
+        device: computation device
+
+    Returns:
+        mu: reconstructed image tensor (B, C, H, W)
+    """
+    
+    import torch
+    import torch.nn.functional as F
+    from tqdm.auto import tqdm
+    import random
+
+    # Initialize reconstruction with adjoint applied to y
+    mu = K.T(y).clone().detach().to(device)
+    mu.requires_grad_(True)
+
+    optimizer = torch.optim.Adam([mu], lr=lr)
+    T = noise_scheduler.alphas_cumprod.shape[0] - 1
+
+    for _ in tqdm(range(num_steps), desc="RED-Diff sampling", unit="step"):
+        # Sample random timestep
+        t = random.randint(1, T)
+        t_batch = torch.full((mu.shape[0],), t, dtype=torch.long, device=device)
+
+        # Noise schedule values
+        alpha_prod = noise_scheduler.alphas_cumprod[t].to(device)
+        sqrt_alpha = torch.sqrt(alpha_prod)
+        sigma_t = torch.sqrt(1 - alpha_prod)
+
+        # Sample noise
+        eps = torch.randn_like(mu)
+        # Forward diffusion to get x_t
+        x_t = sqrt_alpha * mu + sigma_t * eps
+
+        # Predict noise with diffusion model
+        model_out = model(x_t, t_batch)
+        eps_theta = model_out.sample
+
+        # Reconstruction loss
+        rec = F.mse_loss(K(mu), y)
+
+        # Compute SNR and timestep weight
+        snr = sqrt_alpha / sigma_t
+        lambda_t = lambda_scale / snr
+
+        # Regularization loss (stop gradient on eps and weight)
+        reg = (lambda_t.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) * (eps_theta - eps).pow(2)).mean()
+
+        loss = rec + reg
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    return mu.detach()
+
+def red_diff_and_plot(
+    num_images=5,
+    test_loader=None,
+    K=None,
+    model=None,
+    noise_scheduler=None,
+    device="cpu",
+):
+    """
+    Applies RED-Diff to random images from test_loader, then plots original, degraded, and reconstructed.
+
+    Args:
+        num_images: number of images to visualize
+        test_loader: DataLoader for dataset
+        K: degradation operator
+        model: diffusion UNet model
+        noise_scheduler: noise scheduler
+        device: computation device
+    """
+    import matplotlib.pyplot as plt
+    from IPPy import metrics
+
+    # Select random indices
+    indices = random.sample(range(len(test_loader.dataset)), num_images)
+    fig, axes = plt.subplots(num_images, 3, figsize=(12, 4 * num_images))
+
+    for row, idx in enumerate(indices):
+        x_true = test_loader.dataset[idx][0].unsqueeze(0).to(device)
+        y = K(x_true)
+        x_recon = red_diff(
+            model=model,
+            noise_scheduler=noise_scheduler,
+            y=y,
+            K=K,
+            device=device,
+        )
+
+        # Compute metrics
+        psnr_deg = metrics.PSNR(x_true.cpu(), y.cpu())
+        ssim_deg = metrics.SSIM(x_true.cpu(), y.cpu())
+        psnr_rec = metrics.PSNR(x_true.cpu(), x_recon.cpu())
+        ssim_rec = metrics.SSIM(x_true.cpu(), x_recon.cpu())
+
+        # Plot
+        for col, (img, title) in enumerate([
+            (x_true, "Original"),
+            (y, f"Degraded\nPSNR: {psnr_deg:.2f} SSIM: {ssim_deg:.2f}"),
+            (x_recon, f"Reconstructed\nPSNR: {psnr_rec:.2f} SSIM: {ssim_rec:.2f}"),
+        ]):
+            ax = axes[row, col] if num_images > 1 else axes[col]
+            ax.imshow(img.cpu().numpy()[0].transpose(1, 2, 0))
+            ax.axis("off")
+            if row == 0:
+                ax.set_title(title)
+
+    fig.suptitle("RED-Diff Reconstruction", fontsize=16)
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.show()
+
