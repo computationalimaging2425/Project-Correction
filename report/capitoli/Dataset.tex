@@ -1,27 +1,55 @@
-\subsection{Mayo Clinic CT Dataset}
+% chapters/dataset.tex
 
-\begin{frame}{Mayo Clinic CT Dataset}
+% Section 3: Dataset, Preprocessing and Data Augmentation
+
+% Frame 1: Dataset Origin
+\begin{frame}{Dataset Origin}
   \begin{itemize}
-    \item Released by the \textbf{Mayo Clinic} for research purposes.
-    \item Contains chest \textbf{Computed Tomography (CT)} scans.
-    \item Images are in \textbf{grayscale (black and white)} format.
-    \item Focus on \textbf{lung nodules} and early detection of \textbf{lung cancer}.
-    \item Widely used in machine learning and AI medical imaging research.
+    \item We use the "Mayo Clinic CT Dataset" of low-dose CT scans, available via the link provided in this report.
+    \item It contains a total of 6,400 2D slices in PNG format, extracted from 20 different patients.
+    \item The images are organized into:
+      \begin{itemize}
+        \item \texttt{raw\_data/train/}: 5,120 slices for training (80\% of the dataset)
+        \item \texttt{raw\_data/test/}: 1,280 slices for testing (20\% of the dataset)
+      \end{itemize}
+ \begin{figure}
+    \centering
+    \includegraphics[width=0.3\textwidth]{media/2.png}
+    \includegraphics[width=0.3\textwidth]{media/3.png}
+    \includegraphics[width=0.3\textwidth]{media/100.png}
+    \caption{Examples of CT slices from the Mayo Clinic dataset}
+  \end{figure}  
   \end{itemize}
-  \vspace{0.5cm}
-  \begin{center}
-    \includegraphics[width=0.25\linewidth]{media/2.png}
-    \hspace{0.3cm}
-    \includegraphics[width=0.25\linewidth]{media/3.png}
-    \hspace{0.3cm}
-    \includegraphics[width=0.25\linewidth]{media/100.png}
-  \end{center}
 \end{frame}
 
-\begin{frame}{Preprocessing and Augmentation}
+% Frame 2: Conversion Pipeline
+\begin{frame}[fragile]{Conversion Pipeline}
+  Before applying augmentations, each image is converted using:
+  \begin{enumerate}
+    \item \textbf{Grayscale}: single channel via \texttt{transforms.Grayscale(num\_output\_channels=1)}
+    \item \textbf{Resize}: to $128\times128$ pixels using bicubic interpolation
+    \item \textbf{Normalization}: values scaled to $[-1,1]$ using mean $0.5$ and std $0.5$
+  \end{enumerate}
+  \vspace{0.5em}
+  \begin{verbatim}
+base_transform = transforms.Compose([
+    transforms.Grayscale(1),
+    transforms.Resize((128,128), interpolation=Image.BICUBIC),
+    transforms.ToTensor(),
+    transforms.Normalize([0.5], [0.5]),
+])
+  \end{verbatim}
+\end{frame}
+
+% Frame 3: Data Augmentation Types
+\begin{frame}{Data Augmentation: Types}
+  For each clean image, we apply the following transformations:
   \begin{itemize}
-    \item All CT images were preprocessed and resized to a fixed dimension of \textbf{128 × 128 pixels}.
-    \item This standardization ensures consistency for input into deep learning models.
-    \item The dataset was \textbf{augmented} to avoid overfitting and improve model generalization (detailed later).
+    \item \textbf{Fixed rotations}: $\pm5^\circ$ via \texttt{rotate\_fixed()}
+    \item \textbf{Horizontal flip}: \texttt{horizontal\_flip()}
+    \item \textbf{Gaussian noise}: mean $0$, std $10$ via \texttt{add\_gaussian\_noise()}
+    \item \textbf{Salt-and-pepper noise}: probability $2\%$ via \texttt{add\_salt\_pepper()}
+    \item \textbf{Brightness adjustment}: factor $1.2$ via \texttt{change\_brightness()}
+    \item \textbf{Contrast adjustment}: factor $1.3$ via \texttt{change\_contrast()}
   \end{itemize}
 \end{frame}
