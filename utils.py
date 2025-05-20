@@ -164,6 +164,7 @@ def sample_images_from_validation(
     device="cpu",
     max_examples=5,
     epoch=0,
+    save_images=False,
 ):
     """
     Per ogni batch in test_loader:
@@ -223,7 +224,8 @@ def sample_images_from_validation(
                 path = os.path.join(
                     output_dir, f"reconstructed_epoch_{epoch}_{saved}.png"
                 )
-                concat.save(path)
+                if save_images:
+                    concat.save(path)
 
                 # aggiunge liste
                 orig_images.append(img_clean)
