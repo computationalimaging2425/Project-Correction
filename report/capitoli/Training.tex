@@ -97,9 +97,12 @@
         \item \textbf{Checkpoint}:
               \begin{itemize}
                   \item Save the model weights to a \texttt{.pth} file
-                  \item Update loss history in \texttt{loss\_history.txt}
+                  \item Update loss, PSNR and SSIM history in \texttt{history.txt}
               \end{itemize}
-        \item Monitor train vs validation loss over epochs
+        \item Monitor train vs validation loss over epochs aswell as PSNR and SSIM between the generated and original images
+                \begin{itemize}
+                    \item For each epoch sample 10 images from the validation set and compute the metrics
+                \end{itemize}
     \end{itemize}
 \end{frame}
 
