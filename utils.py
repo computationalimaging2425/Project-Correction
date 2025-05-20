@@ -348,6 +348,9 @@ def setup_environment(on_colab=False):
         - test_dir: path to the testing data directory
     """
     if on_colab:
+        # Install IPPy without touching existing packages
+        !pip install git+https://github.com/devangelista2/IPPy.git --no-deps
+
         from google.colab import drive
 
         drive.mount(os.getenv("GOOGLE_DRIVE_CONTENT_PATH", "/content/drive"))
@@ -553,7 +556,6 @@ def dps_deblur_and_plot(
             y=y,
             K=K,
             noise_scheduler=noise_scheduler,
-            num_timesteps=NUM_TRAIN_TIMESTEPS,
             eta=0.0,
             device=device,
         )
