@@ -171,13 +171,16 @@ def sample_images_from_validation(
       • aggiunge rumore x_t = q(x_t|x0) con t casuale
       • predice l'epsilon con la U-Net
       • ricostruisce x0_hat da x_t e epsilon_pred
-      • salva side-by-side (clean | recon) per i primi max_examples
+      • ritorna due liste: immagini originali e ricostruite (primi max_examples)
     """
     os.makedirs(output_dir, exist_ok=True)
     model.eval()
     to_pil = transforms.ToPILImage()
 
+    orig_images = []
+    rec_images = []
     saved = 0
+
     with torch.no_grad():
         for clean_imgs, _ in tqdm(test_loader, desc="Reconstructions"):
             clean_imgs = clean_imgs.to(device)
@@ -198,25 +201,37 @@ def sample_images_from_validation(
             x0_hat = (x_t - sqrt_1m_alpha * out) / sqrt_alpha
             x0_hat = x0_hat.clamp(-1, 1)
 
-            # denormalizza e salva
+            # denormalizza
             clean_np = ((clean_imgs.cpu().numpy() + 1) * 127.5).astype(np.uint8)
             rec_np = ((x0_hat.cpu().numpy() + 1) * 127.5).astype(np.uint8)
 
             for i in range(batch_size):
                 if saved >= max_examples:
-                    return
-                img_clean = clean_np[i, 0]
-                img_rec = rec_np[i, 0]
-                concat = Image.fromarray(np.concatenate([img_clean, img_rec], axis=1))
+                    # ritorna liste quando raggiunto max
+                    return orig_images, rec_images
 
+                # estrai e converte
+                img_clean_array = clean_np[i, 0]
+                img_rec_array = rec_np[i, 0]
+                img_clean = Image.fromarray(img_clean_array)
+                img_rec = Image.fromarray(img_rec_array)
+
+                # salva concatenazione su disco
+                concat = Image.fromarray(
+                    np.concatenate([img_clean_array, img_rec_array], axis=1)
+                )
                 path = os.path.join(
                     output_dir, f"reconstructed_epoch_{epoch}_{saved}.png"
                 )
                 concat.save(path)
+
+                # aggiunge liste
+                orig_images.append(img_clean)
+                rec_images.append(img_rec)
                 saved += 1
 
     print(f"Saved {saved} validation reconstructions to {output_dir}")
-
+    return orig_images, rec_images
 
 def save_checkpoint(model, optimizer, epoch, path):
     """
@@ -348,9 +363,6 @@ def setup_environment(on_colab=False):
         - test_dir: path to the testing data directory
     """
     if on_colab:
-        # Install IPPy without touching existing packages
-        !pip install git+https://github.com/devangelista2/IPPy.git --no-deps
-
         from google.colab import drive
 
         drive.mount(os.getenv("GOOGLE_DRIVE_CONTENT_PATH", "/content/drive"))
