@@ -633,76 +633,81 @@ def red_diff(
     K,  # measurement operator with forward K(x) and adjoint K.T(y)
     noise_scheduler,
     sigma_y=0.01,  # assumed measurement noise std
-    lambda_scale=0.25,  # regularization scale
+    lambda_scale=0.25, # base weight for regularization
     lr=0.1,
+    reg_strategy="linear",  # one of: linear, sqrt, square, log, clip, const
     device="cpu",
 ):
     """
-    Variational sampler (RED-Diff) for inverse problems.
+    RED-Diff optimization-based sampler for inverse problems.
 
     Args:
-        model: pretrained diffusion UNet model
-        noise_scheduler: scheduler providing alphas_cumprod
+        model: diffusion model predicting noise (eps_theta)
+        ddim_scheduler: object containing ordered timesteps
         y: observed measurement (B, C, H, W)
-        K: degradation operator with methods K(x) and K.T(y)
-        sigma_y: measurement noise standard deviation
-        lambda_scale: hyperparameter balancing prior vs likelihood
-        num_steps: number of optimization steps
-        lr: learning rate for Adam
-        device: computation device
+        K: degradation operator with K(x) and K.T(y)
+        noise_scheduler: diffusion noise scheduler with alphas_cumprod
+        sigma_y: std of measurement noise
+        lambda_scale: regularization strength
+        lr: learning rate
+        reg_strategy: weighting scheme for denoising loss
+        device: 'cpu' or 'cuda'
 
     Returns:
-        mu: reconstructed image tensor (B, C, H, W)
+        mu: reconstructed image
     """
-
     import torch
     import torch.nn.functional as F
     from tqdm.auto import tqdm
-    import random
 
-    # Initialize reconstruction with adjoint applied to y
-    mu = K.T(y).clone().detach().to(device)
+    # Initialize reconstruction from adjoint
+    mu = K.T(y).detach().to(device)
     mu.requires_grad_(True)
-
     optimizer = torch.optim.Adam([mu], lr=lr)
-    T = noise_scheduler.alphas_cumprod.shape[0] - 1
 
-    for _ in tqdm(
-        ddim_scheduler.timesteps, desc="RED-Diff sampling", unit="step", leave=False
-    ):
-        # Sample random timestep
-        t = random.randint(1, T)
+    T = noise_scheduler.alphas_cumprod.shape[0] - 1
+    timesteps = ddim_scheduler.timesteps
+
+    for t in tqdm(timesteps, desc="RED-Diff sampling", unit="step", leave=False):
         t_batch = torch.full((mu.shape[0],), t, dtype=torch.long, device=device)
 
-        # Noise schedule values
-        alpha_prod = noise_scheduler.alphas_cumprod[t].to(device)
-        sqrt_alpha = torch.sqrt(alpha_prod)
-        sigma_t = torch.sqrt(1 - alpha_prod)
+        alpha_cumprod = noise_scheduler.alphas_cumprod[t].to(device)
+        sqrt_alpha = torch.sqrt(alpha_cumprod)
+        sigma_t = torch.sqrt(1 - alpha_cumprod)
 
-        # Sample noise
+        # Sample noise and perform forward diffusion
         eps = torch.randn_like(mu)
-        # Forward diffusion to get x_t
         x_t = sqrt_alpha * mu + sigma_t * eps
 
-        # Predict noise with diffusion model
+        # Predict noise (eps_theta) from the model
         model_out = model(x_t, t_batch)
-        eps_theta = model_out.sample
+        eps_theta = model_out.sample  # or model_out if not using .sample
 
-        # Reconstruction loss
-        rec = F.mse_loss(K(mu), y)
+        # Data fidelity term (measurement consistency)
+        loss_obs = F.mse_loss(K(mu), y) / (2 * sigma_y**2)
 
-        # Compute SNR and timestep weight
-        snr = sqrt_alpha / sigma_t
-        lambda_t = lambda_scale / snr
+        # Compute inverse SNR for weight scaling
+        snr_inv = sigma_t / sqrt_alpha  # equivalent to 1/SNR
 
-        # Regularization loss (stop gradient on eps and weight)
-        reg = (
-            lambda_t.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
-            * (eps_theta - eps).pow(2)
-        ).mean()
+        # Apply weighting strategy
+        if reg_strategy == "sqrt":
+            w_t = snr_inv.sqrt()
+        elif reg_strategy == "square":
+            w_t = snr_inv ** 2
+        elif reg_strategy == "log":
+            w_t = torch.log1p(snr_inv)
+        elif reg_strategy == "clip":
+            w_t = torch.clamp(snr_inv, max=1.0)
+        elif reg_strategy == "const":
+            w_t = torch.ones_like(snr_inv)
+        else:  # default: linear
+            w_t = snr_inv
 
-        loss = rec + reg
+        # Regularization term (noise guidance)
+        loss_reg = (w_t.view(-1, 1, 1, 1) * (eps_theta.detach() - eps).pow(2)).mean()
+        loss = loss_obs + lambda_scale * loss_reg
 
+        # Optimize
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
