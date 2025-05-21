@@ -235,6 +235,7 @@ def sample_images_from_validation(
     print(f"Saved {saved} validation reconstructions to {output_dir}")
     return orig_images, rec_images
 
+
 def save_checkpoint(model, optimizer, epoch, path):
     """
     Salva il checkpoint del modello e dell'ottimizzatore.
@@ -439,6 +440,7 @@ def dps_deblur(
     K,  # operatore di blur
     noise_scheduler,
     eta=0.0,  # controlla la stochasticità (0=deterministico)
+    sigma_y=0.01,  # varianza del rumore di misura
     device="cpu",
 ):
     """
@@ -461,76 +463,54 @@ def dps_deblur(
     import torch.nn.functional as F
     from tqdm.auto import tqdm
 
-    # Inizializza x_T con rumore gaussiano
-    batch_size = y.shape[0]
+    B = y.shape[0]
+    # timesteps from scheduler (if custom num steps given override)
+    timesteps = ddim_scheduler.timesteps
+
+    # initialize with noise
     x_t = torch.randn_like(y).to(device)
+    y = y.to(device)
 
-    # Pre-calcola l'operatore adjoint K^T
-    # assumiamo che K abbia un metodo K.adjoint()
-    # Se non è implementato, bisogna implementare la convoluzione trasposta
-    K_adjoint = K.T(y)  # esempio di come potrebbe essere fatto
+    for t in tqdm(timesteps, desc="DPS Deblurring", unit="step", leave=False):
+        t_tensor = torch.full((B,), t, dtype=torch.long, device=device)
+        # 1) UNet predicts noise
+        out = model(x_t, t_tensor)
+        eps_theta = out.sample
 
-    for t in tqdm(
-        ddim_scheduler.timesteps, desc="DPS sampling", unit="step", leave=False
-    ):
-        t_batch = torch.full((batch_size,), t, dtype=torch.long, device=device)
+        # 2) compute x0 pred
+        alpha = noise_scheduler.alphas_cumprod[t].to(device)
+        sqrt_alpha = torch.sqrt(alpha)
+        sqrt_1m_alpha = torch.sqrt(1 - alpha)
+        x0_pred = (x_t - sqrt_1m_alpha * eps_theta) / sqrt_alpha
 
-        # Predizione del rumore epsilon con il modello UNet
-        out = model(x_t, t_batch)
-        eps_theta = out.sample  # <— questo è un Tensor di shape (B, C, H, W)
+        # 3) DPS posterior update: gradient step towards data
+        # gradient of ||y - K x||^2 wrt x at x0_pred: -K^T(y - K x0_pred)
+        # step size gamma_t = sigma_prior^2 / (sigma_y^2 + sigma_prior^2)
+        sigma_prior2 = (1 - alpha).item()
+        gamma = sigma_prior2 / (sigma_y**2 + sigma_prior2)
+        # apply update
+        res = y - K(x0_pred)
+        x0_post = x0_pred + gamma * K.T(res)
 
-        # Calcolo x_0 predetto dal modello: x0_pred = (x_t - sqrt(1-alpha_t) * eps_theta) / sqrt(alpha_t)
-        alpha_prod_t = noise_scheduler.alphas_cumprod[t].to(device)
-        sqrt_alpha_prod_t = torch.sqrt(alpha_prod_t)
-        sqrt_one_minus_alpha_prod_t = torch.sqrt(1 - alpha_prod_t)
-        x0_pred = (x_t - sqrt_one_minus_alpha_prod_t * eps_theta) / sqrt_alpha_prod_t
+        # 4) DDIM update to next timestep
+        # estimate noise using posterior x0
+        eps_post = (x_t - sqrt_alpha * x0_post) / sqrt_1m_alpha
+        # parameters for previous step
+        prev_t = max(t - ddim_scheduler.config.num_train_timesteps // len(timesteps), 0)
+        alpha_prev = noise_scheduler.alphas_cumprod[prev_t].to(device)
+        sqrt_alpha_prev = torch.sqrt(alpha_prev)
+        sqrt_1m_alpha_prev = torch.sqrt(1 - alpha_prev)
 
-        # --- Posterior update DPS ---
-        # Calcolo la likelihood based update usando la degradazione y = K x + noise
-        # Per DPS si aggiorna x0_pred con:
-        # x0_post = argmin_x || y - K x ||^2 / sigma_y^2 + || x - x0_pred ||^2 / sigma_prior^2
-        # formula chiusa: (K^T K / sigma_y^2 + I / sigma_prior^2)^-1 (K^T y / sigma_y^2 + x0_pred / sigma_prior^2)
-
-        # Per semplicità ipotizziamo sigma_y e sigma_prior (varianze)
-        sigma_y = 0.01
-        sigma_prior = torch.sqrt(
-            1 - alpha_prod_t
-        ).item()  # varianza rumore diffusione a t
-
-        # Calcolo termini
-        # x0_pred e y sono tensori (B, C, H, W)
-        K_x0 = K(x0_pred)  # Blur dell'immagine stimata
-
-        # Calcolo il numeratore del posterior update
-        numerator = (K.T(y) / (sigma_y**2)) + (x0_pred / (sigma_prior**2))
-        # Calcolo il denominatore (operatore): (K^T K / sigma_y^2 + I / sigma_prior^2)
-        # Poiché il calcolo esplicito dell'inverso è costoso, approssimiamo con un passo di gradiente o iterazione
-        # Per semplicità facciamo una singola iterazione di gradiente esplicita:
-        # x_new = numerator / denom approx
-        # Nota: un'alternativa più precisa richiede la risoluzione di un sistema lineare (es. CG)
-
-        # Qui approssimiamo denom come (1 / sigma_prior^2 + 1 / sigma_y^2), assumendo K^T K ~ I (approssimazione)
-        denom = (1 / (sigma_prior**2)) + (1 / (sigma_y**2))
-        x0_post = numerator / denom
-
-        # Correggi x_t per il passo successivo usando x0_post (DDIM update formula)
-        # Qui usiamo il metodo DDIM per tornare da x0_post a x_{t-1}
-        # x_t_minus_1 = DDIM update step
-        alpha_prod_t_prev = noise_scheduler.alphas_cumprod[max(t - 1, 0)].to(device)
-        sqrt_alpha_prod_t_prev = torch.sqrt(alpha_prod_t_prev)
-        sigma_t = (
-            eta
-            * torch.sqrt((1 - alpha_prod_t_prev) / (1 - alpha_prod_t))
-            * torch.sqrt(1 - alpha_prod_t / alpha_prod_t_prev)
+        # compute sigma for ddim
+        sigma = eta * torch.sqrt(
+            (1 - alpha_prev) / (1 - alpha) * (1 - alpha / alpha_prev)
         )
 
-        pred_noise = (x_t - sqrt_alpha_prod_t * x0_post) / sqrt_one_minus_alpha_prod_t
-
-        # DDIM step formula
+        # update x_{t-1}
         x_t = (
-            sqrt_alpha_prod_t_prev * x0_post
-            + torch.sqrt(1 - alpha_prod_t_prev - sigma_t**2) * pred_noise
-            + sigma_t * torch.randn_like(x_t)
+            sqrt_alpha_prev * x0_post
+            + sqrt_1m_alpha_prev * eps_post
+            + sigma * torch.randn_like(x_t)
         )
 
     return x_t
@@ -633,7 +613,7 @@ def red_diff(
     K,  # measurement operator with forward K(x) and adjoint K.T(y)
     noise_scheduler,
     sigma_y=0.01,  # assumed measurement noise std
-    lambda_scale=0.25, # base weight for regularization
+    lambda_scale=0.25,  # base weight for regularization
     lr=0.1,
     reg_strategy="linear",  # one of: linear, sqrt, square, log, clip, const
     device="cpu",
@@ -693,7 +673,7 @@ def red_diff(
         if reg_strategy == "sqrt":
             w_t = snr_inv.sqrt()
         elif reg_strategy == "square":
-            w_t = snr_inv ** 2
+            w_t = snr_inv**2
         elif reg_strategy == "log":
             w_t = torch.log1p(snr_inv)
         elif reg_strategy == "clip":
