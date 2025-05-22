@@ -203,8 +203,10 @@ def sample_images_from_validation(
             x0_hat = x0_hat.clamp(-1, 1)
 
             # denormalizza
-            clean_np = ((clean_imgs.cpu().numpy() + 1) * 127.5).astype(np.uint8)
-            rec_np = ((x0_hat.cpu().numpy() + 1) * 127.5).astype(np.uint8)
+            clean_cpu = clean_imgs.detach().cpu()
+            x0_hat_cpu = x0_hat.detach().cpu()
+            clean_np = ((clean_cpu.cpu().numpy() + 1) * 127.5).astype(np.uint8)
+            rec_np = ((x0_hat_cpu.cpu().numpy() + 1) * 127.5).astype(np.uint8)
 
             for i in range(batch_size):
                 if saved >= max_examples:
