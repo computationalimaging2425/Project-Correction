@@ -130,14 +130,19 @@ class AugmentedDataset(Dataset):
 
 
 def sample_images_from_pure_noise(
-    output_path="result/ddim_sample.png",
+    output_dir="checkpoints",
     num_steps=NUM_TRAIN_TIMESTEPS,
     DEVICE="cpu",
     IMAGE_SIZE=128,
     model=None,
     ddim_scheduler=None,
+    epoch=0,
 ):
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+
+    filename = os.path.join(output_dir, f"epoch_{epoch}.png")
+
     model.eval()
     with torch.no_grad():
         # Sample random noise
@@ -151,8 +156,8 @@ def sample_images_from_pure_noise(
 
         # denormalize and save
         final = (sample.clamp(-1, 1) + 1) / 2
-        transforms.ToPILImage()(final.squeeze(0).squeeze(0).cpu()).save(output_path)
-        print(f"Sample saved to {output_path}")
+        transforms.ToPILImage()(final.squeeze(0).squeeze(0).cpu()).save(filename)
+        print(f"Sample saved to {filename}")
 
 
 def sample_images_from_validation(
