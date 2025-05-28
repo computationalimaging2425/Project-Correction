@@ -494,7 +494,7 @@ def dps_deblur(
         # gradient of ||y - K x||^2 wrt x at x0_pred: -K^T(y - K x0_pred)
         # step size gamma_t = sigma_prior^2 / (sigma_y^2 + sigma_prior^2)
         sigma_prior2 = (1 - alpha).item()
-        gamma = sigma_prior2 / (sigma_y**2 + sigma_prior2)
+        gamma = sigma_prior2 / (sigma_y**2 + sigma_prior2**2)
         # apply update
         res = y - K(x0_pred)
         x0_post = x0_pred + gamma * K.T(res)
