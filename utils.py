@@ -137,27 +137,30 @@ def sample_images_from_pure_noise(
     model=None,
     ddim_scheduler=None,
     epoch=0,
+    max_examples=1,
 ):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
-    filename = os.path.join(output_dir, f"epoch_{epoch}.png")
-
     model.eval()
-    with torch.no_grad():
-        # Sample random noise
-        sample = torch.randn((1, 1, IMAGE_SIZE, IMAGE_SIZE), device=DEVICE)
 
-        for t in tqdm(
-            reversed(range(0, num_steps)), desc="Sampling DDIM", total=num_steps
-        ):
-            noise_pred = model(sample, torch.tensor([t], device=DEVICE)).sample
-            sample = ddim_scheduler.step(noise_pred, t, sample).prev_sample
+    for i in tqdm(range(max_examples), desc="Sampling examples"):
+        filename = os.path.join(output_dir, f"epoch_{epoch}_{i}.png")
 
-        # denormalize and save
-        final = (sample.clamp(-1, 1) + 1) / 2
-        transforms.ToPILImage()(final.squeeze(0).squeeze(0).cpu()).save(filename)
-        print(f"Sample saved to {filename}")
+        with torch.no_grad():
+            # Sample random noise
+            sample = torch.randn((1, 1, IMAGE_SIZE, IMAGE_SIZE), device=DEVICE)
+
+            for t in tqdm(
+                reversed(range(0, num_steps)), desc="Sampling DDIM", total=num_steps, leave=False
+            ):
+                noise_pred = model(sample, torch.tensor([t], device=DEVICE)).sample
+                sample = ddim_scheduler.step(noise_pred, t, sample).prev_sample
+
+            # denormalize and save
+            final = (sample.clamp(-1, 1) + 1) / 2
+            transforms.ToPILImage()(final.squeeze(0).squeeze(0).cpu()).save(filename)
+            print(f"Sample saved to {filename}")
 
 
 def sample_images_from_validation(
