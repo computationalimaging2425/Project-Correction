@@ -144,7 +144,7 @@ def sample_images_from_pure_noise(
 
     model.eval()
 
-    for i in tqdm(range(max_examples), desc="Sampling examples"):
+    for i in range(max_examples):
         filename = os.path.join(output_dir, f"epoch_{epoch}_{i}.png")
 
         with torch.no_grad():
@@ -152,7 +152,7 @@ def sample_images_from_pure_noise(
             sample = torch.randn((1, 1, IMAGE_SIZE, IMAGE_SIZE), device=DEVICE)
 
             for t in tqdm(
-                reversed(range(0, num_steps)), desc="Sampling DDIM", total=num_steps, leave=False
+                reversed(range(0, num_steps)), desc="Sampling DDIM", unit="step", total=num_steps
             ):
                 noise_pred = model(sample, torch.tensor([t], device=DEVICE)).sample
                 sample = ddim_scheduler.step(noise_pred, t, sample).prev_sample
