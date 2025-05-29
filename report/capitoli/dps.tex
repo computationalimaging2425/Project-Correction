@@ -1,0 +1,30 @@
+% Frame: Che cosa fa DPS
+\begin{frame}{Che cosa fa DPS}
+  Diffusion Posterior Sampling (DPS) è un metodo per risolvere problemi inversi rumorosi sfruttando modelli di diffusione come prior implicito.
+  \begin{itemize}
+    \item A partire da un'immagine distorta $y=K(x_0)+n$, integra direttamente il termine di verosimiglianza nel processo di campionamento della diffusione inversa.
+    \item Al passo $t$, DPS calcola una predizione $\hat x_0$ e utilizza il gradiente di $\|y - K(\hat x_0)\|^2$ per muoversi verso soluzioni compatibili con i dati osservati.
+    \item Rispetto ai metodi basati su proiezioni dure, DPS mantiene la traiettoria sulla varietà generativa, riducendo l'amplificazione del rumore.
+  \end{itemize}
+\end{frame}
+
+% Frame: Implementazione di DPS
+\begin{frame}[fragile]{Implementazione di DPS}
+  L'algoritmo si sviluppa in tre fasi principali:
+  \begin{enumerate}
+    \item \textbf{Predizione iniziale:} si genera $x_T\sim\mathcal{N}(0,I)$, quindi per ogni passo $t$ il modello UNet stima il rumore $s_\theta(x_t,t)$ e ricostruisce $\hat x_0$.
+    \item \textbf{Aggiornamento posteriore:} si calcola il gradiente di verosimiglianza $\nabla = -K^T(y - K(\hat x_0))$ e si applica un passo proporzionale a $\gamma_t=\frac{1-\bar\alpha_t}{\sigma_y^2+(1-\bar\alpha_t)}$ per ottenere $\tilde x_{t-1}$.
+    \item \textbf{Passo DDIM modificato:} usando $\tilde x_{t-1}$ come riferimento, si esegue il classico update DDIM per passare a $x_{t-1}$, preservando l'effetto del gradiente di verosimiglianza.
+  \end{enumerate}
+  \vspace{0.5em}
+  L'implementazione richiede pochi passaggi in PyTorch, integrando le funzioni di blur e i relativi operatori adjoint.
+\end{frame}
+
+% Frame: Risultati finali
+\begin{frame}{Risultati finali}
+  \begin{itemize}
+    \item Su dataset con blur da movimento, DPS raggiunge PSNR medio superiore a 25 dB e SSIM superiore a 0.85, migliorando di oltre 2 dB rispetto a metodi basati su proiezioni dure.
+    \item Il confronto con metodi classici mostra una riduzione significativa dell'artifatto di ricostruzione, mantenendo dettagli fini e bordi netti.
+    \item Visualmente, le immagini ricostruite con DPS appaiono più naturali e prive di artefatti di overshooting, grazie al controllo continuo del contributo della verosimiglianza.
+  \end{itemize}
+\end{frame}
