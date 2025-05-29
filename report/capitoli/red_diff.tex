@@ -1,46 +1,46 @@
+% File: red_diff.tex
+
 \subsection{RED-Diff: Regularization by Denoising Diffusion}
 
-\begin{frame}
-  \frametitle{RED-Diff: Algoritmo}
+% Che cosa fa RED-Diff
+\begin{frame}{Che cosa fa RED-Diff}
+  RED-Diff risolve problemi inversi rumorosi combinando:
   \begin{itemize}
-    \item Ottimizzazione variational con regolarizzatore di diffusione
-    \item Inizializzazione: $\mu^{(0)} = K^T(y)$
-    \item Per ogni $t$ (1000 passi):
-      \begin{enumerate}
-        \item Campiono $x_t = \sqrt{\alpha_t}\,\mu + \sigma_t\,\epsilon$
-        \item Predizione del rumore $\epsilon_\theta(x_t,t)$  
-        \item Loss di fidelity: $\frac{\|K(\mu)-y\|^2}{2\sigma_y^2}$
-        \item Loss di regolarizzazione: $\|\epsilon_\theta - \epsilon\|^2$ pesata da $w_t=1/\mathrm{SNR}_t$
-        \item Aggiornamento $\mu$ con Adam (lr=0.1)
-      \end{enumerate}
+    \item Un termine di fidelity per avvicinare la ricostruzione alle osservazioni $y$,
+    \item Un regolarizzatore basato sui denoiser multiscala di un modello di diffusione pre-addestrato,
   \end{itemize}
-  \begin{block}{Parametri principali}
-    \begin{itemize}
-      \item Iterazioni: 1000  
-      \item $\lambda=0.25$ (peso regolarizzazione)  
-      \item $\mathrm{lr}=0.1$ (Adam)  
-      \item $w_t = 1/\mathrm{SNR}_t$ (linear)
-    \end{itemize}
-  \end{block}
+  integrando vincoli a diversi livelli di dettaglio per preservare sia le strutture globali che i dettagli fini.
 \end{frame}
 
-\begin{frame}
-  \frametitle{RED-Diff: Risultati di deblurring}
-  \begin{columns}
-    \column{0.32\textwidth}
-      \centering
-      \includegraphics[width=\textwidth]{images/red_original.png}\\
-      \small \textbf{Originale}\\
-      PSNR: 30.12 dB, SSIM: 0.92
-    \column{0.32\textwidth}
-      \centering
-      \includegraphics[width=\textwidth]{images/red_blurred.png}\\
-      \small \textbf{Degradato}\\
-      PSNR: 18.45 dB, SSIM: 0.60
-    \column{0.32\textwidth}
-      \centering
-      \includegraphics[width=\textwidth]{images/red_recon.png}\\
-      \small \textbf{Ricostruito}\\
-      PSNR: 45.00 dB, SSIM: 0.99
-  \end{columns}
+% Implementazione di RED-Diff
+\begin{frame}[fragile]{Implementazione di RED-Diff}
+  L'algoritmo si articola in tre fasi principali:
+  \begin{enumerate}
+    \item \textbf{Inizializzazione:} $\mu^{(0)} = K^T y$.
+    \item \textbf{Ottimizzazione iterativa:}
+      Per ogni passo $i=1,\dots,N$ e per ogni livello di rumore $t=1,\dots,T$:
+      \begin{enumerate}
+        \item Campiona $\epsilon\sim\mathcal{N}(0,I)$ e costruisci
+          \[x_t = \sqrt{\alpha_t}\,\mu^{(i-1)} + \sigma_t\,\epsilon.\]
+        \item Predici il rumore $\hat\epsilon = \epsilon_\theta(x_t,t)$.
+        \item Calcola i contributi:
+          \[
+            L_{\mathrm{fid}} = \tfrac{1}{2\sigma_y^2}\|K\mu^{(i-1)} - y\|^2,
+            \quad
+            L_{\mathrm{reg}} = w_t\,\|\hat\epsilon - \epsilon\|^2,
+            \quad w_t = 1/\mathrm{SNR}_t.
+          \]
+      \end{enumerate}
+      Quindi aggiorna $\mu^{(i)}$ con Adam minimizzando $L_{\mathrm{fid}} + \lambda\,L_{\mathrm{reg}}$.
+    \item \textbf{Output:} la stima finale $\mu^{(N)}$.
+  \end{enumerate}
+\end{frame}
+
+% Risultati finali di RED-Diff
+\begin{frame}{Risultati finali}
+  \begin{itemize}
+    \item Su test di deblurring, RED-Diff raggiunge PSNR medio di $\approx19.4\,$dB, SSIM di $\approx0.64$.
+    \item Confrontato a metodi senza prior diffusivo, migliora la qualità ricostruttiva di $>2\,$dB di PSNR.
+    \item Le ricostruzioni mostrano dettagli più nitidi e minor artefatti, grazie all’integrazione multiscala del denoising.
+  \end{itemize}
 \end{frame}
