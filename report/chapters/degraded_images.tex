@@ -1,0 +1,28 @@
+\subsection{Degraded Images}
+
+\begin{frame}{Image Degradation}
+    \begin{itemize}
+        \item \textbf{Library}: IPPy
+        \item \textbf{Degradation Type}: Motion Blur
+        \item \textbf{Implementation}: Linear operator approach
+        \item \textbf{Purpose}: Create realistic inverse problems for model evaluation
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Motion Blur Configuration}
+    \begin{itemize}
+        \item \textbf{Operator}: \texttt{operators.Blurring}
+        \item \textbf{Parameters}:
+              \begin{itemize}
+                  \item Image shape: $(128 \times 128)$ pixels
+                  \item Kernel type: \texttt{"motion"}
+                  \item Motion angle: $45\degree$
+                  \item Kernel sizes tested: $[5, 7, 9, 11, 13, 15]$ pixels
+              \end{itemize}
+        \item \textbf{Mathematical Model}:
+              \begin{equation}
+                  y = K(x) + n
+              \end{equation}
+              where $K$ is the blur operator, $x$ is the clean image, and $n$ is noise
+    \end{itemize}
+\end{frame}
