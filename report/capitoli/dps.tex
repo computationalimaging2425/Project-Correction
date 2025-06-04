@@ -1,23 +1,34 @@
-% Frame: What DPS Does
 \begin{frame}{DPS: Diffusion Posterior Sampling}
-  Diffusion Posterior Sampling (DPS) is a method for solving noisy inverse problems by leveraging diffusion models as an implicit prior.
   \begin{itemize}
-    \item Starting from a corrupted image $y = K(x_0) + n$, it directly integrates the likelihood term into the reverse diffusion sampling process.
-    \item At step $t$, DPS computes a prediction $\hat x_0$ and uses the gradient of $\|y - K(\hat x_0)\|^2$ to move towards solutions consistent with the observed data.
-    \item Compared to hard projection methods, DPS keeps the trajectory on the generative manifold, reducing noise amplification.
+    \item \textbf{DPS} is a method for solving inverse problems using pre-trained diffusion models
+    \item Key idea: combine data fidelity with diffusion model prior during reverse sampling
+    \item Modifies the standard DDIM reverse process to incorporate measurement consistency
   \end{itemize}
 \end{frame}
 
-% Frame: Implementation of DPS
-\begin{frame}[fragile]{Implementation of DPS}
-  The algorithm consists of three main phases:
+
+\begin{frame}{DPS - Overview}
+  \textbf{Algorithm Overview:}
   \begin{enumerate}
-    \item \textbf{Initial prediction:} Sample $x_T \sim \mathcal{N}(0, I)$, then for each step $t$, the UNet model estimates the noise $s_\theta(x_t, t)$ and reconstructs $\hat x_0$.
-    \item \textbf{Posterior update:} Compute the likelihood gradient $\nabla = -K^T(y - K(\hat x_0))$ and apply a step proportional to $\gamma_t = \frac{1 - \bar\alpha_t}{\sigma_y^2 + (1 - \bar\alpha_t)}$ to obtain $\tilde x_{t-1}$.
-    \item \textbf{Modified DDIM step:} Using $\tilde x_{t-1}$ as a reference, perform the standard DDIM update to move to $x_{t-1}$, preserving the effect of the likelihood gradient.
+    \item Start with noisy initialization $x_T \sim \mathcal{N}(0, I)$
+    \item For each timestep $t$: predict $x_0$ using UNet
+    \item Apply posterior correction: $x_0^{post} = x_0^{pred} + \gamma_t \cdot K^T(y - K x_0^{pred})$
+    \item Continue DDIM step with corrected $x_0^{post}$
   \end{enumerate}
+
+  \textbf{Posterior Correction Weight:}
+  $$\gamma_t = \frac{\sigma_{prior}^2}{\sigma_y^2 + \sigma_{prior}^2}$$
+  where $\sigma_{prior}^2 = 1 - \alpha_t$ and $\sigma_y$ is measurement noise
 \end{frame}
 
-% Frame: Final Results
-\begin{frame}{Final Results}
+% Frame: Implementation of DPS
+\begin{frame}{Implementation of DPS}
+  \textbf{Algorithm Steps:}
+  \begin{enumerate}
+    \item Initialize $x_t$ with random noise
+    \item Predict noise $\epsilon_\theta(x_t, t)$ using UNet
+    \item Compute $x_0^{pred} = \frac{x_t - \sqrt{1-\alpha_t} \epsilon_\theta}{\sqrt{\alpha_t}}$
+    \item Apply DPS correction with gradient step
+    \item Update to next timestep using DDIM
+  \end{enumerate}
 \end{frame}

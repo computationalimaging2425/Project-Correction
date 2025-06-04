@@ -1,40 +1,39 @@
-
 \subsection{RED-Diff: Regularization by Denoising Diffusion}
-
-% What RED-Diff does
-\begin{frame}{What RED-Diff Does}
-  RED-Diff solves noisy inverse problems by combining:
+\begin{frame}{RED-Diff: Regularization by Denoising Diffusion}
   \begin{itemize}
-    \item A fidelity term to bring the reconstruction closer to the observations $y$,
-    \item A regularizer based on the multiscale denoisers of a pretrained diffusion model,
+    \item \textbf{RED-Diff} is an optimization-based method for solving inverse problems using diffusion models
+    \item Key idea: combine data fidelity loss with regularization from denoising diffusion priors
+    \item Uses gradient-based optimization to reconstruct images by minimizing combined objective
   \end{itemize}
-  integrating constraints at multiple levels of detail to preserve both global structures and fine details.
 \end{frame}
 
-% Implementation of RED-Diff
-\begin{frame}[fragile]{Implementation of RED-Diff}
-  The algorithm is structured into three main phases:
+
+\begin{frame}{RED-Diff - Overview}
+  \textbf{Algorithm Overview:}
   \begin{enumerate}
-    \item \textbf{Initialization:} $\mu^{(0)} = K^T y$.
-    \item \textbf{Iterative Optimization:}
-      For each step $i=1,\dots,N$ and for each noise level $t=1,\dots,T$:
-      \begin{enumerate}
-        \item Sample $\epsilon\sim\mathcal{N}(0,I)$ and construct
-          \[x_t = \sqrt{\alpha_t}\,\mu^{(i-1)} + \sigma_t\,\epsilon.\]
-        \item Predict the noise $\hat\epsilon = \epsilon_\theta(x_t,t)$.
-        \item Compute the loss terms:
-          \[
-            L_{\mathrm{fid}} = \tfrac{1}{2\sigma_y^2}\|K\mu^{(i-1)} - y\|^2,
-            \quad
-            L_{\mathrm{reg}} = w_t\,\|\hat\epsilon - \epsilon\|^2,
-            \quad w_t = 1/\mathrm{SNR}_t.
-          \]
-      \end{enumerate}
-      Then update $\mu^{(i)}$ using Adam to minimize $L_{\mathrm{fid}} + \lambda\,L_{\mathrm{reg}}$.
-    \item \textbf{Output:} the final estimate $\mu^{(N)}$.
+    \item Initialize reconstruction $\mu$ from adjoint operation: $\mu = K^T(y)$
+    \item For each timestep $t$: sample noise and create noisy version $x_t$
+    \item Compute data fidelity loss: $\mathcal{L}_{obs} = \frac{1}{2\sigma_y^2}\|K(\mu) - y\|^2$
+    \item Compute regularization loss using diffusion model guidance
+    \item Update $\mu$ using gradient descent on combined loss
   \end{enumerate}
+
+  \textbf{Combined Objective:}
+  $$\mathcal{L} = \mathcal{L}_{obs} + \lambda \cdot w_t \cdot \mathcal{L}_{reg}$$
+  where $w_t$ is a time-dependent weighting strategy
 \end{frame}
 
-% Final results of RED-Diff
-\begin{frame}{Final Results}
+% Frame: Implementation of RED-Diff
+\begin{frame}{Implementation of RED-Diff}
+  \textbf{Algorithm Steps:}
+  \begin{enumerate}
+    \item Initialize $\mu \leftarrow K^T(y)$ with gradient enabled
+    \item Sample noise $\epsilon \sim \mathcal{N}(0, I)$ and create $x_t = \sqrt{\alpha_t}\mu + \sqrt{1-\alpha_t}\epsilon$
+    \item Predict noise $\epsilon_\theta(x_t, t)$ using UNet
+    \item Compute regularization loss: $\mathcal{L}_{reg} = w_t \cdot \|\epsilon_\theta - \epsilon\|^2$
+    \item Update $\mu$ using Adam optimizer on total loss
+    \item Repeat for all timesteps in reverse order
+  \end{enumerate}
+
+  \textbf{Weighting Strategies:} linear, sqrt, square, log, clip, const
 \end{frame}
