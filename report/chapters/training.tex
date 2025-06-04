@@ -12,26 +12,6 @@
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Data Augmentation}
-    \begin{itemize}
-        \item \textbf{Base Dataset}: Dataset Mayo
-              \begin{itemize}
-                  \item Grayscale → 1 channel
-                  \item Resize images to \texttt{128 $\times$ 128}
-              \end{itemize}
-        \item \textbf{Augmentations} (8 types):
-              \begin{itemize}
-                  \item \emph{None}: no transformation
-                  \item \texttt{Rotation} ±5° (rotation + centering)
-                  \item \texttt{Flip} horizontal
-                  \item \texttt{Gaussian noise} (mean=0, std=10)
-                  \item \texttt{Salt and pepper noise} (prob=2\%)
-                  \item \texttt{Brightness} (factor=1.2)
-                  \item \texttt{Contrast} (factor=1.3)
-              \end{itemize}
-    \end{itemize}
-\end{frame}
-
 \begin{frame}{Schedulers for Diffusion}
     \begin{itemize}
         \item \textbf{DDPMScheduler} for training diffusion process
