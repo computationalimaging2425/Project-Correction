@@ -5,15 +5,15 @@
         \item \textbf{Dataset}: Validation set from the before-mentioned dataset
         \item \textbf{Degradation}: Motion blur with varying kernel sizes
         \item \textbf{Methods Compared}:
-              \begin{itemize}
-                  \item DPS (Diffusion Posterior Sampling)
-                  \item RED-Diff (Regularization by Denoising)
-              \end{itemize}
+        \begin{itemize}
+            \item DPS (Diffusion Posterior Sampling)
+            \item RED-Diff (Regularization by Denoising)
+        \end{itemize}
         \item \textbf{Evaluation Metrics}:
-              \begin{itemize}
-                  \item PSNR (Peak Signal-to-Noise Ratio) in dB
-                  \item SSIM (Structural Similarity Index)
-              \end{itemize}
+        \begin{itemize}
+            \item PSNR (Peak Signal-to-Noise Ratio) in dB
+            \item SSIM (Structural Similarity Index)
+        \end{itemize}
     \end{itemize}
 \end{frame}
 
@@ -76,20 +76,42 @@
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Visual Results Summary}
-    \begin{itemize}
-        \item \textbf{Qualitative Assessment}:
-              \begin{itemize}
-                  \item Side-by-side comparisons: Original → Blurred → Reconstructed
-                  \item Visual quality correlation with quantitative metrics
-                  \item Edge preservation and artifact analysis
-              \end{itemize}
-        \item \textbf{Key Findings}:
-              \begin{itemize}
-                  \item RED-Diff better preserves fine details
-                  \item RED-Diff shows less artifacts compared to DPS
-                  \item RED-Diff keeps consistent performances across different kernel sizes
-                  \item DPS is more sensitive to kernel size variations, as shown in the PSNR and SSIM results
-              \end{itemize}
-    \end{itemize}
+\begin{frame}{Results - Qualitative Analysis}
+\begin{itemize}
+    \item \textbf{Qualitative Assessment}:
+          \begin{itemize}
+              \item Side-by-side comparisons: Original → Blurred → Reconstructed
+              \item Visual quality correlation with quantitative metrics
+              \item Edge preservation and artifact analysis
+          \end{itemize}
+    \item \textbf{Key Findings}:
+          \begin{itemize}
+              \item RED-Diff better preserves fine details
+              \item RED-Diff shows less artifacts compared to DPS
+              \item RED-Diff keeps consistent performances across different kernel sizes
+              \item DPS is more sensitive to kernel size variations, as shown in the PSNR and SSIM results
+          \end{itemize}
+
+    \item \textbf{Visual Results}: To better understand the performance of both methods, we will show visual results for both DPS and RED-Diff a visual comparison had been conducted and reported on kernel size equal to 7 in the next slides.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Visual Results Summary - DPS}
+    Figure \ref{fig:visual_results_dps} presents visual comparisons of the original, blurred, and reconstructed images for both methods across different kernel sizes using DPS.
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.5\textwidth]{media/deblurring_dps.png}
+        \caption{Visual results for DPS across different kernel sizes.}
+        \label{fig:visual_results_dps}
+    \end{figure}
+
+\end{frame}
+\begin{frame}{Visual Results Summary - RED-Diff}
+    Figure \ref{fig:visual_results_red_diff} presents visual comparisons of the original, blurred, and reconstructed images for both methods across different kernel sizes using RED-Diff.
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.5\textwidth]{media/deblurring_reddiff.png}
+        \caption{Visual results for RED-Diff across different kernel sizes.}
+        \label{fig:visual_results_red_diff}
+    \end{figure}
 \end{frame}
