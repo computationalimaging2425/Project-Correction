@@ -16,8 +16,6 @@
     \item \textbf{Posterior update:} Compute the likelihood gradient $\nabla = -K^T(y - K(\hat x_0))$ and apply a step proportional to $\gamma_t = \frac{1 - \bar\alpha_t}{\sigma_y^2 + (1 - \bar\alpha_t)}$ to obtain $\tilde x_{t-1}$.
     \item \textbf{Modified DDIM step:} Using $\tilde x_{t-1}$ as a reference, perform the standard DDIM update to move to $x_{t-1}$, preserving the effect of the likelihood gradient.
   \end{enumerate}
-  \vspace{0.5em}
-  The implementation requires only a few steps in PyTorch, integrating blur functions and their adjoint operators.
 \end{frame}
 
 % Frame: Final Results
