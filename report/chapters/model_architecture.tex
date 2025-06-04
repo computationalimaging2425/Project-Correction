@@ -1,0 +1,87 @@
+\subsection{Model Architecture}
+
+\begin{frame}{Diffusion Model Architecture}
+    \begin{itemize}
+        \item \textbf{Model Type}: UNet2DModel from HuggingFace Diffusers library
+        \item \textbf{Task}: Denoising diffusion probabilistic model for grayscale image generation
+        \item \textbf{Input/Output}:
+              \begin{itemize}
+                  \item Input channels: 1
+                  \item Output channels: 1
+                  \item Sample size: $128 \times 128$ pixels
+              \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{UNet Architecture Configuration}
+    \begin{itemize}
+        \item \textbf{Block Configuration}:
+              \begin{itemize}
+                  \item Layers per block: 2
+                  \item Block output channels: (64, 128, 256)
+                  \item Dropout rate: 0.1
+              \end{itemize}
+        \item \textbf{Downsampling Path}:
+              \begin{itemize}
+                  \item DownBlock2D → DownBlock2D → AttnDownBlock2D
+                  \item Progressive feature extraction with attention in the deepest layer
+              \end{itemize}
+        \item \textbf{Upsampling Path}:
+              \begin{itemize}
+                  \item AttnUpBlock2D → UpBlock2D → UpBlock2D
+                  \item Symmetric architecture with attention mechanism
+              \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Diffusion Schedulers}
+    \begin{itemize}
+        \item \textbf{Training Scheduler}: DDPMScheduler
+              \begin{itemize}
+                  \item Number of timesteps: 1000
+                  \item Used for forward diffusion process during training
+                  \item Adds noise progressively over 1000 steps
+              \end{itemize}
+        \item \textbf{Inference Scheduler}: DDIMScheduler
+              \begin{itemize}
+                  \item Number of timesteps: 1000
+                  \item Deterministic sampling process
+                  \item Used for image generation and inverse problems
+                  \item Shares beta schedule with DDPM scheduler
+              \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Model Optimization}
+    \begin{itemize}
+        \item \textbf{Optimizer}: Adam
+              \begin{itemize}
+                  \item Learning rate: $1\times 10^{-4}$
+                  \item Weight decay: $1\times 10^{-5}$
+              \end{itemize}
+        \item \textbf{Loss Function}: Mean Squared Error \(MSE\)
+              \begin{itemize}
+                  \item Compares predicted noise with actual noise
+                  \item Standard objective for diffusion models
+              \end{itemize}
+        \item \textbf{Performance Optimizations}:
+              \begin{itemize}
+                  \item Model compilation with \texttt{torch.compile}
+                  \item Mixed precision training with GradScaler
+                  \item Cosine annealing learning rate scheduler
+              \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Architecture Summary}
+    \begin{itemize}
+        \item \textbf{Total Parameters}: 15.722.625
+        \item \textbf{Key Features}:
+              \begin{itemize}
+                  \item Attention mechanisms in deepest layers for better feature learning
+                  \item Symmetric U-Net design for optimal information flow
+                  \item Dropout regularization to prevent overfitting
+                  \item Grayscale-optimized with single channel processing
+              \end{itemize}
+    \end{itemize}
+\end{frame}
