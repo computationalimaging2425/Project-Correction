@@ -9,7 +9,7 @@
   \setbeamertemplate{navigation symbols}{}
   \setbeamertemplate{headline}{}
 }
-\usepackage[italian]{babel}
+\usepackage[english]{babel}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{algpseudocode}
@@ -24,11 +24,11 @@
 }
 
 % Title and Author
-\title[Progetto]{Performance Analysis for Projection-Correction Methods in Motion Deblurring Problems}
-\author[Autore]{Sara Casadio, Enrico Ferraiolo, Giovanni Maria Savoca}
-\institute[Istituzione]{%
-  Alma Mater Studiorum - Università di Bologna \\
-  Corso di Laurea in Informatica
+\title[Project]{Performance Analysis for Projection-Correction Methods in Motion Deblurring Problems}
+\author[Author]{Sara Casadio, Enrico Ferraiolo, Giovanni Maria Savoca}
+\institute[Institution]{%
+  Alma Mater Studiorum - University of Bologna \\
+  Master's Degree in Computer Science
 }
 \date{\today}
 
@@ -40,26 +40,26 @@
 \end{frame}
 
 % Section 1
-\section{Descrizione del problema}
+\section{Problem Description}
 \input{capitoli/DescrizioneProblema.tex}
 
 % Section 2
-\section{Approccio di risoluzione con dps e rediff + modello diffusivo}
+\section{Approach to Resolution with DPS and Rediff + Diffusion Model}
 \input{capitoli/ApproccioRisoluzione.tex}
 
 % Section 3
-\section{Dataset, Preprocessing e Data Augmentation}
+\section{Dataset, Preprocessing and Data Augmentation}
 %Preprocessing del dataset (128*128) + dataset aumentato 
 \input{capitoli/dataset.tex}
 
 
 % Section 4
-\section{Organizzazione della repository}
+\section{Repository Organization}
 \input{capitoli/OrganizzazioneRepo.tex}
 
 
 % Section 5
-\section{architettura della rete diffusiva} 
+\section{Architecture of the Diffusion Network} 
 % \input{capitoli/ArchitetturaDDIM.tex}
 
 
@@ -69,42 +69,42 @@
 \input{capitoli/Training.tex}
 
 % Section 7
-\section{Caricamento dei pesi (come funziona che non dobbiamo sempre allenare il modello e possiamo caricarli deìirettamente )} 
+\section{Loading Weights (how it works so we don't always have to train the model and can load them directly)} 
 \subsection{Sottosezione 2.1}
 \begin{frame}{Sottosezione 2.1}
   % Contenuto qui
 \end{frame}
 
 % Section 8
-\section{codice dei due metodi} 
+\section{Code for the Two Methods}
 \input{capitoli/dps.tex}
 \input{capitoli/red_diff.tex}
 
 
 % Section 9
-\section{codice immagine degradata} 
+\section{Code for Degraded Image}
 \subsection{Sottosezione 2.1}
 \begin{frame}{Sottosezione 2.1}
   % Contenuto qui
 \end{frame}
 
 % Section 10
-\section{risultati} 
+\section{Results}
 \subsection{Sottosezione 2.1}
 \begin{frame}{Sottosezione 2.1}
   % Contenuto qui
 \end{frame}
 
 % Conclusions
-\section{Conclusioni}
-\begin{frame}{Conclusioni}
-  % Punti chiave
+\section{Conclusions}
+\begin{frame}{Conclusions}
+  % Key points
 \end{frame}
 
 % Thank You Frame
 \begin{frame}
   \centering
-  {\Huge Grazie per l'attenzione}
+  {\Huge Thank you for your attention}
 \end{frame}
 
 \end{document}

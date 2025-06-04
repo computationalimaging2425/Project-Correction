@@ -2,28 +2,28 @@
 
 \subsection{RED-Diff: Regularization by Denoising Diffusion}
 
-% Che cosa fa RED-Diff
-\begin{frame}{Che cosa fa RED-Diff}
-  RED-Diff risolve problemi inversi rumorosi combinando:
+% What RED-Diff does
+\begin{frame}{What RED-Diff Does}
+  RED-Diff solves noisy inverse problems by combining:
   \begin{itemize}
-    \item Un termine di fidelity per avvicinare la ricostruzione alle osservazioni $y$,
-    \item Un regolarizzatore basato sui denoiser multiscala di un modello di diffusione pre-addestrato,
+    \item A fidelity term to bring the reconstruction closer to the observations $y$,
+    \item A regularizer based on the multiscale denoisers of a pretrained diffusion model,
   \end{itemize}
-  integrando vincoli a diversi livelli di dettaglio per preservare sia le strutture globali che i dettagli fini.
+  integrating constraints at multiple levels of detail to preserve both global structures and fine details.
 \end{frame}
 
-% Implementazione di RED-Diff
-\begin{frame}[fragile]{Implementazione di RED-Diff}
-  L'algoritmo si articola in tre fasi principali:
+% Implementation of RED-Diff
+\begin{frame}[fragile]{Implementation of RED-Diff}
+  The algorithm is structured into three main phases:
   \begin{enumerate}
-    \item \textbf{Inizializzazione:} $\mu^{(0)} = K^T y$.
-    \item \textbf{Ottimizzazione iterativa:}
-      Per ogni passo $i=1,\dots,N$ e per ogni livello di rumore $t=1,\dots,T$:
+    \item \textbf{Initialization:} $\mu^{(0)} = K^T y$.
+    \item \textbf{Iterative Optimization:}
+      For each step $i=1,\dots,N$ and for each noise level $t=1,\dots,T$:
       \begin{enumerate}
-        \item Campiona $\epsilon\sim\mathcal{N}(0,I)$ e costruisci
+        \item Sample $\epsilon\sim\mathcal{N}(0,I)$ and construct
           \[x_t = \sqrt{\alpha_t}\,\mu^{(i-1)} + \sigma_t\,\epsilon.\]
-        \item Predici il rumore $\hat\epsilon = \epsilon_\theta(x_t,t)$.
-        \item Calcola i contributi:
+        \item Predict the noise $\hat\epsilon = \epsilon_\theta(x_t,t)$.
+        \item Compute the loss terms:
           \[
             L_{\mathrm{fid}} = \tfrac{1}{2\sigma_y^2}\|K\mu^{(i-1)} - y\|^2,
             \quad
@@ -31,16 +31,16 @@
             \quad w_t = 1/\mathrm{SNR}_t.
           \]
       \end{enumerate}
-      Quindi aggiorna $\mu^{(i)}$ con Adam minimizzando $L_{\mathrm{fid}} + \lambda\,L_{\mathrm{reg}}$.
-    \item \textbf{Output:} la stima finale $\mu^{(N)}$.
+      Then update $\mu^{(i)}$ using Adam to minimize $L_{\mathrm{fid}} + \lambda\,L_{\mathrm{reg}}$.
+    \item \textbf{Output:} the final estimate $\mu^{(N)}$.
   \end{enumerate}
 \end{frame}
 
-% Risultati finali di RED-Diff
-\begin{frame}{Risultati finali}
+% Final results of RED-Diff
+\begin{frame}{Final Results}
   \begin{itemize}
-    \item Su test di deblurring, RED-Diff raggiunge PSNR medio di $\approx19.4\,$dB, SSIM di $\approx0.64$.
-    \item Confrontato a metodi senza prior diffusivo, migliora la qualità ricostruttiva di $>2\,$dB di PSNR.
-    \item Le ricostruzioni mostrano dettagli più nitidi e minor artefatti, grazie all’integrazione multiscala del denoising.
+    \item On deblurring tests, RED-Diff achieves an average PSNR of approximately $19.4\,$dB and SSIM of approximately $0.64$.
+    \item Compared to methods without a diffusion prior, it improves reconstruction quality by more than $2\,$dB in PSNR.
+    \item Reconstructions show sharper details and fewer artifacts thanks to the multiscale integration of denoising.
   \end{itemize}
 \end{frame}
