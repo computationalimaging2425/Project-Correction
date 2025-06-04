@@ -40,55 +40,42 @@
   \titlepage
 \end{frame}
 
-% Section 1
 \section{Problem Description}
 \input{chapters/problem_description.tex}
 
-% Section 2
 \section{Approach to Resolution with DPS and Rediff + Diffusion Model}
 \input{chapters/solution_approach.tex}
 
-% Section 3
 \section{Dataset, Preprocessing and Data Augmentation}
 %Preprocessing del dataset (128*128) + dataset aumentato 
 \input{chapters/dataset.tex}
 
 
-% Section 4
 \section{Repository Organization}
 \input{chapters/repository_organization.tex}
 
 
-% Section 5
 \section{Architecture of the Diffusion Network} 
 \input{chapters/model_architecture.tex}
 
 
 
-% Section 6
 \section{Training} %data augmentation + data loader + scheduler + torch.compite + grade scaler + cosineannealing + spiegaizone dello step di apprendimento della reta + per ogni epoca viene stampata una immagine per capire se la rete sta funzionando + spiegazione loss (come funziona) + salvataggio pesi + grafico loss
 \input{chapters/training.tex}
 
-% Section 7
 \section{Loading Weights (how it works so we don't always have to train the model and can load them directly)} 
 \input{chapters/loading_checkpoints.tex}
 
-% Section 8
 \section{Project Correction Methods}
 \input{chapters/dps.tex}
 \input{chapters/red_diff.tex}
 
 
-% Section 9
 \section{Degraded Image}
 \input{chapters/degraded_images.tex}
 
-% Section 10
 \section{Results}
-\subsection{Sottosezione 2.1}
-\begin{frame}{Sottosezione 2.1}
-  % Contenuto qui
-\end{frame}
+\input{chapters/results.tex}
 
 % Conclusions
 \section{Conclusions}
