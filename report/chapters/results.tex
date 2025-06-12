@@ -115,3 +115,20 @@
         \label{fig:visual_results_red_diff}
     \end{figure}
 \end{frame}
+
+\begin{frame}{Scaling to 256x256}
+    \begin{itemize}
+        \item We explored training at a larger target size of $256\times256$ pixels.
+        \item Due to hardware and Colab limits, full $256\times256$ training proved very slow.
+        \item We expect comparable results at $256\times256$ because:
+            \begin{itemize}
+                \item Model architecture and training pipeline remain the same.
+                \item Reliable performance at $128\times128$ gives confidence in scaling up.
+            \end{itemize}
+        \item If $256\times256$ runs underperform, we can still approach $128\times128$-level results by:
+            \begin{itemize}
+                \item Leveraging our robust data augmentation to enrich the larger-scale inputs.
+            \end{itemize}
+        \item The implementation is flexible, so once faster hardware or longer runtimes are available, we can re-run full $256\times256$ experiments with minimal changes.
+    \end{itemize}
+\end{frame}
