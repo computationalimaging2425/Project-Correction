@@ -84,6 +84,10 @@ The DPS method modifies the standard DDIM reverse process to incorporate measure
 #### RED-Diff Implementation  
 The RED-Diff method uses optimization-based reconstruction with configurable weighting strategies (linear, sqrt, square, log, clip, const)
 
+### Results
+We achieved excellent result, obtainining 40db PSNR and 0.984 SSIM values for the reconstructed images.
+Further details are in the report directory.
+
 ### Notes
 - The project includes comprehensive data augmentation to improve model robustness with 8 different augmentation types applied to each base image
 - Both DPS and RED-Diff methods include visualization functions that automatically compute and display PSNR and SSIM metrics for performance evaluation
