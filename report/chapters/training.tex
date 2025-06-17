@@ -12,18 +12,6 @@
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Schedulers for Diffusion}
-    \begin{itemize}
-        \item \textbf{DDPMScheduler} for training diffusion process
-              \begin{itemize}
-                  \item \texttt{Timesteps} 1000
-              \end{itemize}
-        \item \textbf{DDIMScheduler} for sampling
-              \begin{itemize}
-                  \item \texttt{Timesteps} 1000
-              \end{itemize}
-    \end{itemize}
-\end{frame}
 
 \begin{frame}{Compiling the Model}
     \begin{itemize}
@@ -50,7 +38,6 @@
 
 \begin{frame}{Training Loop}
     \begin{enumerate}
-        \item Loss function: \texttt{MSE}
         \item Start the training \texttt{model.train()}
         \item For each epoch:
               \begin{itemize}
@@ -60,7 +47,7 @@
                   \item Prediction + MSE loss
                   \item Optimization + \texttt{scheduler.step()}
               \end{itemize}
-        \item Save validation samples to visualize the model performance during training
+        \item Save samples to visualize the model performance during training
         \item Compute and log average losses
         \item Save model weights each epoch
     \end{enumerate}
@@ -71,7 +58,6 @@
         \item \textbf{Validation}:
               \begin{itemize}
                   \item \texttt{model.eval()} to set the model to evaluation mode
-                  \item MSE loss on validation set
               \end{itemize}
         \item \textbf{Checkpoint}:
               \begin{itemize}
@@ -85,7 +71,7 @@
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Epoch Validation}
+\begin{frame}{Epochs Validation}
     \begin{itemize}
         \item \textbf{Metrics}:
               \begin{itemize}
@@ -113,15 +99,16 @@
     \begin{itemize}
         \item \textbf{Pure Noise Sampling}:
               \begin{itemize}
-                  \item Tests model's ability to generate realistic images
+                  \item Tests model's ability to generate images from noise that are similar to the training data
                   \item Uses DDIM scheduler for iterative denoising
-                  \item Saves generated images as \texttt{generated\_epoch\_\{epoch\}.png}
+                  \item Saves generated images as \texttt{epoch\_\{epoch\}.png}
               \end{itemize}
         \item \textbf{Validation Reconstruction}:
               \begin{itemize}
                   \item Adds noise to clean validation images
                   \item Model predicts and removes the noise
                   \item Direct assessment of denoising performance
+                  \item Saves reconstructed images as \texttt{reconstructed\_\{epoch\}.png}
               \end{itemize}
         \item \textbf{History Tracking}:
               \begin{itemize}
