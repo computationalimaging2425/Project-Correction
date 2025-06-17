@@ -97,21 +97,21 @@
 \end{frame}
 
 \begin{frame}{Visual Results Summary - DPS}
-    Figure \ref{fig:visual_results_dps} presents visual comparisons of the original, blurred, and reconstructed images for both methods across different kernel sizes using DPS.
+    Figure \ref{fig:visual_results_dps} presents visual comparisons of the original, blurred, and reconstructed images for both methods for kernel size 7 using DPS.
     \begin{figure}
         \centering
         \includegraphics[width=0.5\textwidth]{media/deblurring_dps.png}
-        \caption{Visual results for DPS across different kernel sizes.}
+        \caption{Visual results for DPS.}
         \label{fig:visual_results_dps}
     \end{figure}
 
 \end{frame}
 \begin{frame}{Visual Results Summary - RED-Diff}
-    Figure \ref{fig:visual_results_red_diff} presents visual comparisons of the original, blurred, and reconstructed images for both methods across different kernel sizes using RED-Diff.
+    Figure \ref{fig:visual_results_red_diff} presents visual comparisons of the original, blurred, and reconstructed images for both methods for kernel size 7 using RED-Diff.
     \begin{figure}
         \centering
         \includegraphics[width=0.5\textwidth]{media/deblurring_reddiff.png}
-        \caption{Visual results for RED-Diff across different kernel sizes.}
+        \caption{Visual results for RED-Diff.}
         \label{fig:visual_results_red_diff}
     \end{figure}
 \end{frame}
@@ -123,7 +123,6 @@
         \item We expect comparable results at $256\times256$ because:
             \begin{itemize}
                 \item Model architecture and training pipeline remain the same.
-                \item Reliable performance at $128\times128$ gives confidence in scaling up.
             \end{itemize}
         \item If $256\times256$ runs underperform, we can still approach $128\times128$-level results by:
             \begin{itemize}
